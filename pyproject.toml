@@ -1,0 +1,21 @@
+[project]
+name = "pytest-recap"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Jeffrey Wright", email = "jeffrey.wright@wartsila.com" }
+]
+requires-python = ">=3.9"
+dependencies = [
+    "filelock>=3.18.0",
+    "pytest-rerunfailures>=15.0",
+    "pytest>=8.3.5",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.entry-points.pytest11]
+recap = "pytest_recap.plugin"
