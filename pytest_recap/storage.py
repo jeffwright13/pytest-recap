@@ -1,10 +1,13 @@
 import json
 from pathlib import Path
 from typing import List, Optional
+
 from filelock import FileLock
+
 
 class JSONStorage:
     """Stores test sessions as a list of dicts in a local JSON file, with file locking for concurrency."""
+
     def __init__(self, file_path: Optional[str] = None):
         self.file_path = Path(file_path) if file_path else Path.home() / ".pytest_recap" / "sessions.json"
         self.file_path.parent.mkdir(parents=True, exist_ok=True)

@@ -1,10 +1,12 @@
 import json
-from pathlib import Path
-from datetime import datetime, timedelta, timezone
-import pytest
 import threading
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+import pytest
+from pytest_recap.models import TestOutcome, TestResult, TestSession
 from pytest_recap.storage import JSONStorage
-from pytest_recap.models import TestSession, TestResult, TestOutcome
+
 
 def make_session(session_id="test-123", start=None, stop=None):
     start = start or datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
@@ -28,6 +30,7 @@ def make_session(session_id="test-123", start=None, stop=None):
         test_results=[tr],
     )
 
+
 def test_save_and_load_session(tmp_path):
     file_path = tmp_path / "sessions.json"
     storage = JSONStorage(file_path=file_path)
@@ -37,6 +40,7 @@ def test_save_and_load_session(tmp_path):
     assert len(loaded) == 1
     assert loaded[0]["session_id"] == "test-123"
 
+
 def test_default_file_path(tmp_path, monkeypatch):
     # Patch Path.home to tmp_path for isolation
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -44,6 +48,7 @@ def test_default_file_path(tmp_path, monkeypatch):
     session = make_session()
     storage.save_session(session.to_dict())
     assert (tmp_path / ".pytest_recap" / "sessions.json").exists()
+
 
 def test_path_override(tmp_path):
     custom_path = tmp_path / "custom.json"
@@ -54,6 +59,7 @@ def test_path_override(tmp_path):
     data = json.loads(custom_path.read_text())
     assert any(s["session_id"] == "override" for s in data)
 
+
 def test_handles_missing_and_corrupt_file(tmp_path):
     file_path = tmp_path / "bad.json"
     storage = JSONStorage(file_path=file_path)
@@ -63,13 +69,16 @@ def test_handles_missing_and_corrupt_file(tmp_path):
     file_path.write_text("{bad json}")
     assert storage.load_sessions() == []
 
+
 def test_concurrent_access(tmp_path):
     file_path = tmp_path / "sessions.json"
     storage = JSONStorage(file_path=file_path)
     session = make_session()
+
     def writer():
         for _ in range(10):
             storage.save_session(session.to_dict())
+
     threads = [threading.Thread(target=writer) for _ in range(5)]
     for t in threads:
         t.start()
@@ -78,6 +87,7 @@ def test_concurrent_access(tmp_path):
     # Should have 50 sessions (5 threads x 10 writes)
     loaded = storage.load_sessions()
     assert len(loaded) == 50
+
 
 def test_data_integrity(tmp_path):
     file_path = tmp_path / "sessions.json"
@@ -93,6 +103,7 @@ def test_data_integrity(tmp_path):
     ids = [s["session_id"] for s in loaded]
     assert "integrity" in ids and "integrity2" in ids
 
+
 def test_storage_file_is_directory(tmp_path):
     dir_path = tmp_path / "sessions.json"
     dir_path.mkdir()
@@ -100,6 +111,7 @@ def test_storage_file_is_directory(tmp_path):
     # Should handle gracefully and not crash
     with pytest.raises((IsADirectoryError, OSError, PermissionError)):
         storage.save_session({"foo": "bar"})
+
 
 def test_storage_permission_error(tmp_path):
     file_path = tmp_path / "sessions.json"
@@ -112,11 +124,13 @@ def test_storage_permission_error(tmp_path):
     finally:
         file_path.chmod(0o600)
 
+
 def test_storage_file_is_dict(tmp_path):
     file_path = tmp_path / "sessions.json"
     file_path.write_text(json.dumps({"not": "a list"}))
     storage = JSONStorage(file_path=file_path)
     assert storage.load_sessions() == []
+
 
 def test_storage_large_sessions(tmp_path):
     file_path = tmp_path / "sessions.json"
@@ -127,16 +141,20 @@ def test_storage_large_sessions(tmp_path):
     loaded = storage.load_sessions()
     assert len(loaded) == 1000
 
+
 def test_storage_partial_write(tmp_path):
     file_path = tmp_path / "sessions.json"
     file_path.write_text("[{}")  # Truncated JSON
     storage = JSONStorage(file_path=file_path)
     assert storage.load_sessions() == []
 
+
 def test_storage_non_serializable(tmp_path):
     file_path = tmp_path / "sessions.json"
     storage = JSONStorage(file_path=file_path)
+
     class NotSerializable:
         pass
+
     with pytest.raises(TypeError):
         storage.save_session({"obj": NotSerializable()})

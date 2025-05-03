@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta, timezone
-import pytest
 
-from pytest_recap.models import TestOutcome, TestResult, RerunTestGroup, TestSession
+import pytest
+from pytest_recap.models import RerunTestGroup, TestOutcome, TestResult, TestSession
+
 
 def test_testoutcome_from_str_and_to_str():
     assert TestOutcome.from_str("passed") == TestOutcome.PASSED
@@ -12,17 +13,20 @@ def test_testoutcome_from_str_and_to_str():
     with pytest.raises(ValueError):
         TestOutcome.from_str("not_a_real_outcome")
 
+
 def test_testoutcome_is_failed():
     assert TestOutcome.FAILED.is_failed() is True
     assert TestOutcome.ERROR.is_failed() is True
     assert TestOutcome.PASSED.is_failed() is False
     assert TestOutcome.SKIPPED.is_failed() is False
 
+
 def test_testoutcome_from_str_none_and_empty():
     assert TestOutcome.from_str(None) == TestOutcome.SKIPPED
     assert TestOutcome.from_str("") == TestOutcome.SKIPPED
     with pytest.raises(ValueError):
         TestOutcome.from_str("   ")
+
 
 def test_testresult_init_and_to_dict():
     start = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
@@ -46,6 +50,7 @@ def test_testresult_init_and_to_dict():
     assert datetime.fromisoformat(d["stop_time"]) == stop
     assert d["duration"] == 2.0
 
+
 def test_testresult_from_dict():
     start = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
     stop = start + timedelta(seconds=2)
@@ -68,6 +73,7 @@ def test_testresult_from_dict():
     assert result.start_time == start
     assert result.stop_time == stop
 
+
 @pytest.mark.parametrize("duration", [0, -1])
 def test_testresult_negative_and_zero_duration(duration):
     start = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
@@ -81,6 +87,7 @@ def test_testresult_negative_and_zero_duration(duration):
     )
     d = result.to_dict()
     assert d["duration"] == duration
+
 
 @pytest.mark.parametrize("extra_field", ["foo", "bar"])
 def test_testresult_from_dict_with_extra_fields(extra_field):
@@ -96,6 +103,7 @@ def test_testresult_from_dict_with_extra_fields(extra_field):
     }
     result = TestResult.from_dict(d)
     assert result.nodeid == "test_extra.py::test_extra"
+
 
 def test_reruntestgroup_add_and_final_outcome():
     start = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
@@ -125,10 +133,12 @@ def test_reruntestgroup_add_and_final_outcome():
     assert group2.tests[1].outcome == TestOutcome.FAILED
     assert group2.tests[0].start_time == start
 
+
 def test_reruntestgroup_empty_final_outcome():
     group = RerunTestGroup(nodeid="foo")
     assert group.final_outcome is None
     assert group.to_dict()["tests"] == []
+
 
 def test_reruntestgroup_all_skipped():
     start = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
@@ -142,6 +152,7 @@ def test_reruntestgroup_all_skipped():
     group = RerunTestGroup(nodeid="foo")
     group.add_test(tr)
     assert group.final_outcome == TestOutcome.SKIPPED
+
 
 def test_testsession_add_and_to_from_dict():
     start = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
@@ -179,6 +190,7 @@ def test_testsession_add_and_to_from_dict():
     assert session2.session_start_time == start
     assert session2.session_stop_time == stop
 
+
 def test_testsession_empty():
     start = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
     stop = start + timedelta(seconds=10)
@@ -197,6 +209,7 @@ def test_testsession_empty():
     assert d["test_results"] == []
     assert d["rerun_test_groups"] == []
 
+
 def test_testsession_from_dict_missing_fields():
     # Only required fields
     start = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
@@ -212,6 +225,7 @@ def test_testsession_from_dict_missing_fields():
     assert session.session_stop_time == stop
     assert session.test_results == []
     assert session.rerun_test_groups == []
+
 
 def test_testsession_both_stop_and_duration_match(caplog):
     start = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
@@ -234,6 +248,7 @@ def test_testsession_both_stop_and_duration_match(caplog):
     assert session.session_duration == duration
     assert any("Ignoring session_duration" in r.message for r in caplog.records)
 
+
 def test_testsession_both_stop_and_duration_mismatch(caplog):
     start = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
     duration = 10.0
@@ -254,6 +269,7 @@ def test_testsession_both_stop_and_duration_mismatch(caplog):
     assert session.session_stop_time == stop
     assert session.session_duration == 8.0
     assert any("Ignoring session_duration" in r.message for r in caplog.records)
+
 
 """
 This test isn't quite right, and it might be more appropriate in test_plugin.py, because you want to run the

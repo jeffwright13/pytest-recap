@@ -1,20 +1,18 @@
-import pytest
-from _pytest.config import Config, ExitCode
-from _pytest.config.argparsing import Parser
-from _pytest.main import Session
-from _pytest.nodes import Item
-from _pytest.python import Metafunc
-from _pytest.reports import TestReport
-from _pytest.runner import CallInfo
-from _pytest.terminal import TerminalReporter, WarningReport
-from datetime import datetime, timedelta, timezone
 import os
 import platform
 import socket
 import sys
+from datetime import datetime, timedelta, timezone
+from typing import Dict, List
+
+import pytest
+from _pytest.config import Config
+from _pytest.config.argparsing import Parser
+from _pytest.terminal import TerminalReporter
+
 from pytest_recap.models import RerunTestGroup, TestOutcome, TestResult, TestSession
 from pytest_recap.storage import JSONStorage
-from typing import Dict, List
+
 
 def group_tests_into_rerun_test_groups(
     test_results: List[TestResult],
@@ -26,8 +24,8 @@ def group_tests_into_rerun_test_groups(
         rerun_test_groups[test_result.nodeid].add_test(test_result)
     return [group for group in rerun_test_groups.values() if len(group.tests) > 1]
 
-def pytest_addoption(parser: Parser) -> None:
 
+def pytest_addoption(parser: Parser) -> None:
     group = parser.getgroup("Pytest Recap")
     group.addoption(
         "--recap",
@@ -81,7 +79,8 @@ def pytest_terminal_summary(terminalreporter: TerminalReporter, exitstatus: int,
                 # Use report.start if available, else fallback to now
                 report_time = (
                     datetime.fromtimestamp(getattr(report, "start", now.timestamp()), tz=timezone.utc)
-                    if hasattr(report, "start") else now
+                    if hasattr(report, "start")
+                    else now
                 )
                 if session_start is None or report_time < session_start:
                     session_start = report_time
