@@ -1,7 +1,7 @@
 [project]
 name = "pytest-recap"
-version = "0.2.0"
-description = "Plugin for pytest to capture test session data and save it as a JSON file"
+version = "0.4.0"
+description = "Capture your test sessions. Recap the results."
 readme = "README.md"
 authors = [
     { name = "Jeff Wright", email = "jeff.washcloth@gmail.com" }
@@ -11,6 +11,7 @@ dependencies = [
     "filelock>=3.18.0",
     "pytest-rerunfailures>=15.0",
     "pytest>=8.3.5",
+    "requests>=2.32.3",
 ]
 
 [build-system]

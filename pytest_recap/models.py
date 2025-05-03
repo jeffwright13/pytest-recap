@@ -316,6 +316,7 @@ class TestSession:
         """
         return {
             "session_id": self.session_id,
+            "session_tags": self.session_tags or {},
             "session_start_time": self.session_start_time.isoformat(),
             "session_stop_time": self.session_stop_time.isoformat(),
             "session_duration": self.session_duration,
@@ -326,7 +327,6 @@ class TestSession:
                 {"nodeid": group.nodeid, "tests": [t.to_dict() for t in group.tests]}
                 for group in self.rerun_test_groups
             ],
-            "session_tags": self.session_tags or {},
         }
 
     @classmethod

@@ -271,65 +271,336 @@ def test_testsession_both_stop_and_duration_mismatch(caplog):
     assert any("Ignoring session_duration" in r.message for r in caplog.records)
 
 
-"""
-This test isn't quite right, and it might be more appropriate in test_plugin.py, because you want to run the
-tests and then analyze the TestSession and RerunTestGroup objects.
+def test_testoutcome_all_enum_members():
+    # Check all enum members exist and have correct string values
+    expected = ["PASSED", "FAILED", "SKIPPED", "XFAILED", "XPASSED", "RERUN", "ERROR"]
+    actual = [e.name for e in TestOutcome]
+    assert actual == expected
+    for member in TestOutcome:
+        assert isinstance(member.value, str)
+        assert member == TestOutcome[member.name]
 
-def test_rerun_test_group_entries_identical_except_outcome():
-    # Create a base TestResult
-    base_result = TestResult(
-        nodeid="test_demo.py::test_flaky[1]",
-        outcome=TestOutcome.FAILED,
-        start_time=datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
-        stop_time=datetime(2024, 1, 1, 12, 0, 5, tzinfo=timezone.utc),
-        duration=5.0,
-        caplog="log1",
-        capstderr="stderr1",
-        capstdout="stdout1",
-        longreprtext="longrepr1",
-        has_warning=False,
+
+def test_testoutcome_from_str_case_insensitive():
+    # Should accept any case
+    assert TestOutcome.from_str("passed") == TestOutcome.PASSED
+    assert TestOutcome.from_str("FAILED") == TestOutcome.FAILED
+    assert TestOutcome.from_str("skipped") == TestOutcome.SKIPPED
+    assert TestOutcome.from_str("xFaIlEd") == TestOutcome.XFAILED
+    assert TestOutcome.from_str("XpAsSeD") == TestOutcome.XPASSED
+    assert TestOutcome.from_str("rerun") == TestOutcome.RERUN
+    assert TestOutcome.from_str("error") == TestOutcome.ERROR
+
+
+def test_testoutcome_from_str_invalid():
+    # Should raise ValueError for unknown outcome
+    import pytest
+
+    with pytest.raises(ValueError):
+        TestOutcome.from_str("not_a_real_outcome")
+
+
+def test_testoutcome_to_str():
+    # Should always return lowercase string
+    for member in TestOutcome:
+        assert member.to_str() == member.value.lower()
+
+
+def test_testoutcome_to_list():
+    # Should return all lowercase values
+    expected = [m.value.lower() for m in TestOutcome]
+    assert TestOutcome.to_list() == expected
+
+
+def test_testresult_minimal_and_full():
+    from datetime import datetime, timezone
+
+    from pytest_recap.models import TestOutcome, TestResult
+
+    # Minimal
+    result = TestResult(
+        nodeid="foo",
+        outcome=TestOutcome.PASSED,
+        start_time=None,
+        stop_time=None,
+        duration=None,
     )
-    # Create rerun variants with different outcomes
-    rerun_results = [
-        base_result,
-        TestResult(**{**base_result.__dict__, "outcome": TestOutcome.RERUN}),
-        TestResult(**{**base_result.__dict__, "outcome": TestOutcome.RERUN}),
-        TestResult(**{**base_result.__dict__, "outcome": TestOutcome.RERUN}),
-        TestResult(**{**base_result.__dict__, "outcome": TestOutcome.FAILED}),
-    ]
-    # Simulate rerun group
-    rerun_group = RerunTestGroup(nodeid="test_demo.py::test_flaky[1]")
-    rerun_group.add_test(base_result)
-    rerun_group.add_test(TestResult(**{**base_result.__dict__, "outcome": TestOutcome.RERUN}))
-    rerun_group.add_test(TestResult(**{**base_result.__dict__, "outcome": TestOutcome.RERUN}))
-    rerun_group.add_test(TestResult(**{**base_result.__dict__, "outcome": TestOutcome.FAILED}))
-    # Place all in test_results for TestSession
+    d = result.to_dict()
+    assert d["nodeid"] == "foo"
+    assert d["outcome"] == "passed"
+    # Full
+    now = datetime.now(timezone.utc)
+    result = TestResult(
+        nodeid="bar",
+        outcome=TestOutcome.FAILED,
+        start_time=now,
+        stop_time=now,
+        duration=0.0,
+        caplog="log",
+        capstderr="stderr",
+        capstdout="stdout",
+        longreprtext="long",
+        has_warning=True,
+    )
+    d = result.to_dict()
+    restored = TestResult.from_dict(d)
+    assert restored.nodeid == "bar"
+    assert restored.outcome == TestOutcome.FAILED
+    assert restored.caplog == "log"
+    assert restored.has_warning is True
+
+
+def test_testresult_post_init_duration_and_stop_time():
+    from datetime import datetime, timedelta, timezone
+
+    from pytest_recap.models import TestOutcome, TestResult
+
+    # Compute stop_time from duration
+    now = datetime.now(timezone.utc)
+    result = TestResult(
+        nodeid="foo",
+        outcome=TestOutcome.PASSED,
+        start_time=now,
+        stop_time=None,
+        duration=5.0,
+    )
+    assert result.stop_time == now + timedelta(seconds=5.0)
+    # Compute duration from stop_time
+    later = now + timedelta(seconds=7)
+    result = TestResult(
+        nodeid="foo",
+        outcome=TestOutcome.PASSED,
+        start_time=now,
+        stop_time=later,
+        duration=None,
+    )
+    assert result.duration == 7.0
+
+
+def test_testresult_post_init_missing_both():
+    from pytest_recap.models import TestOutcome, TestResult
+
+    # Should not raise, but both None
+    result = TestResult(
+        nodeid="foo",
+        outcome=TestOutcome.PASSED,
+        start_time=None,
+        stop_time=None,
+        duration=None,
+    )
+    assert result.duration is None
+    assert result.stop_time is None
+
+
+def test_testresult_from_dict_invalid():
+    import pytest
+    from pytest_recap.models import TestResult
+
+    # Missing nodeid
+    with pytest.raises(KeyError):
+        TestResult.from_dict({"outcome": "passed"})
+    # Invalid outcome
+    with pytest.raises(ValueError):
+        TestResult.from_dict({"nodeid": "foo", "outcome": "notreal"})
+
+
+def test_reruntestgroup_add_and_order():
+    from datetime import datetime, timezone
+
+    from pytest_recap.models import RerunTestGroup, TestOutcome, TestResult
+
+    now = datetime.now(timezone.utc)
+    group = RerunTestGroup(nodeid="foo")
+    r1 = TestResult("foo", TestOutcome.RERUN, now, now, 0.0)
+    r2 = TestResult("foo", TestOutcome.FAILED, now, now, 0.0)
+    group.add_test(r1)
+    group.add_test(r2)
+    assert group.tests == [r1, r2]
+
+
+def test_reruntestgroup_final_outcome():
+    from datetime import datetime, timezone
+
+    from pytest_recap.models import RerunTestGroup, TestOutcome, TestResult
+
+    now = datetime.now(timezone.utc)
+    group = RerunTestGroup(nodeid="foo")
+    r1 = TestResult("foo", TestOutcome.RERUN, now, now, 0.0)
+    r2 = TestResult("foo", TestOutcome.FAILED, now, now, 0.0)
+    group.add_test(r1)
+    group.add_test(r2)
+    assert group.final_outcome == TestOutcome.FAILED
+    group2 = RerunTestGroup(nodeid="foo")
+    group2.add_test(r1)
+    assert group2.final_outcome == TestOutcome.RERUN
+    group3 = RerunTestGroup(nodeid="foo")
+    assert group3.final_outcome is None
+
+
+def test_reruntestgroup_to_and_from_dict():
+    from datetime import datetime, timezone
+
+    from pytest_recap.models import RerunTestGroup, TestOutcome, TestResult
+
+    now = datetime.now(timezone.utc)
+    r1 = TestResult("foo", TestOutcome.PASSED, now, now, 0.0)
+    group = RerunTestGroup(nodeid="foo", tests=[r1])
+    d = group.to_dict()
+    restored = RerunTestGroup.from_dict(d)
+    assert restored.nodeid == "foo"
+    assert len(restored.tests) == 1
+    assert restored.tests[0].nodeid == "foo"
+
+
+def test_reruntestgroup_from_dict_invalid():
+    import pytest
+    from pytest_recap.models import RerunTestGroup
+
+    with pytest.raises(ValueError):
+        RerunTestGroup.from_dict([1, 2, 3])
+
+
+def test_testsession_post_init_logic():
+    from datetime import datetime, timedelta, timezone
+
+    import pytest
+    from pytest_recap.models import TestSession
+
+    now = datetime.now(timezone.utc)
+    # Error if both stop_time and duration missing
+    with pytest.raises(ValueError):
+        TestSession(
+            sut_name="test",
+            testing_system={},
+            session_id="id",
+            session_start_time=now,
+            session_stop_time=None,
+            session_duration=None,
+            session_tags={},
+            rerun_test_groups=[],
+            test_results=[],
+        )
+    # duration computed from stop_time
+    stop = now + timedelta(seconds=3)
     session = TestSession(
         sut_name="test",
-        testing_system=None,
+        testing_system={},
         session_id="id",
-        session_start_time=base_result.start_time,
-        session_stop_time=base_result.stop_time,
-        session_duration=base_result.duration,
-        session_tags=None,
-        rerun_test_groups=[rerun_group],
-        test_results=rerun_results,
+        session_start_time=now,
+        session_stop_time=stop,
+        session_duration=None,
+        session_tags={},
+        rerun_test_groups=[],
+        test_results=[],
     )
-    # For each rerun group, check all entries are identical except for outcome
-    for group in session.rerun_test_groups:
-        base = group.tests[0]
-        for rerun in group.tests[1:]:
-            # Compare all attributes except outcome
-            for field in base.__dataclass_fields__:
-                if field == "outcome":
-                    continue
-                assert getattr(rerun, field) == getattr(base, field), f"Mismatch in field {field}"
-        # Check that all rerun group entries are present in test_results
-        for rerun in group.tests:
-            found = False
-            for orig in session.test_results:
-                if all(getattr(rerun, f) == getattr(orig, f) for f in rerun.__dataclass_fields__ if f != "outcome"):
-                    found = True
-                    break
-            assert found, f"Rerun entry {rerun.nodeid} not found in test_results"
-"""
+    assert session.session_duration == 3.0
+    # stop_time computed from duration
+    session = TestSession(
+        sut_name="test",
+        testing_system={},
+        session_id="id",
+        session_start_time=now,
+        session_stop_time=None,
+        session_duration=2.0,
+        session_tags={},
+        rerun_test_groups=[],
+        test_results=[],
+    )
+    assert abs((session.session_stop_time - now).total_seconds() - 2.0) < 0.01
+
+
+def test_testsession_to_and_from_dict():
+    from datetime import datetime, timezone
+
+    from pytest_recap.models import RerunTestGroup, TestOutcome, TestResult, TestSession
+
+    now = datetime.now(timezone.utc)
+    r1 = TestResult("foo", TestOutcome.PASSED, now, now, 0.0)
+    group = RerunTestGroup(nodeid="foo", tests=[r1])
+    session = TestSession(
+        sut_name="test",
+        testing_system={"platform": "linux"},
+        session_id="id",
+        session_start_time=now,
+        session_stop_time=now,
+        session_duration=0.0,
+        session_tags={"env": "ci"},
+        rerun_test_groups=[group],
+        test_results=[r1],
+    )
+    d = session.to_dict()
+    restored = TestSession.from_dict(d)
+    assert restored.sut_name == "test"
+    assert restored.testing_system["platform"] == "linux"
+    assert restored.session_tags["env"] == "ci"
+    assert len(restored.rerun_test_groups) == 1
+    assert len(restored.test_results) == 1
+
+
+def test_testsession_add_test_result_and_rerun_group():
+    from datetime import datetime, timezone
+
+    from pytest_recap.models import RerunTestGroup, TestOutcome, TestResult, TestSession
+
+    now = datetime.now(timezone.utc)
+    session = TestSession(
+        sut_name="test",
+        testing_system={},
+        session_id="id",
+        session_start_time=now,
+        session_stop_time=now,
+        session_duration=0.0,
+        session_tags={},
+        rerun_test_groups=[],
+        test_results=[],
+    )
+    r1 = TestResult("foo", TestOutcome.PASSED, now, now, 0.0)
+    group = RerunTestGroup(nodeid="foo", tests=[r1])
+    session.add_test_result(r1)
+    session.add_rerun_group(group)
+    assert session.test_results[-1] == r1
+    assert session.rerun_test_groups[-1] == group
+
+
+def test_testsession_add_test_result_invalid():
+    from datetime import datetime, timezone
+
+    import pytest
+    from pytest_recap.models import TestSession
+
+    now = datetime.now(timezone.utc)
+    session = TestSession(
+        sut_name="test",
+        testing_system={},
+        session_id="id",
+        session_start_time=now,
+        session_stop_time=now,
+        session_duration=0.0,
+        session_tags={},
+        rerun_test_groups=[],
+        test_results=[],
+    )
+    with pytest.raises(ValueError):
+        session.add_test_result("not_a_test_result")
+
+
+def test_testsession_add_rerun_group_invalid():
+    from datetime import datetime, timezone
+
+    import pytest
+    from pytest_recap.models import TestSession
+
+    now = datetime.now(timezone.utc)
+    session = TestSession(
+        sut_name="test",
+        testing_system={},
+        session_id="id",
+        session_start_time=now,
+        session_stop_time=now,
+        session_duration=0.0,
+        session_tags={},
+        rerun_test_groups=[],
+        test_results=[],
+    )
+    with pytest.raises(ValueError):
+        session.add_rerun_group("not_a_rerun_group")
