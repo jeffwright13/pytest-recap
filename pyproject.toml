@@ -20,10 +20,6 @@ build-backend = "hatchling.build"
 [project.entry-points.pytest11]
 recap = "pytest_recap.plugin"
 
-[tool.isort]
-profile = "black"
-line_length = 120
-
 [tool.ruff]
 line-length = 120
 fix = true
@@ -46,7 +42,6 @@ testpaths = ["tests"]
 
 [dependency-groups]
 dev = [
-    "black>=25.1.0",
     "isort>=6.0.1",
     "pre-commit>=4.2.0",
     "pytest-cov>=6.1.1",

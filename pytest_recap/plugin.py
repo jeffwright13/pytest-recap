@@ -90,7 +90,7 @@ def pytest_terminal_summary(terminalreporter: TerminalReporter, exitstatus: int,
                 test_results.append(
                     TestResult(
                         nodeid=report.nodeid,
-                        outcome=TestOutcome.from_str(outcome) if outcome else TestOutcome.SKIPPED,
+                        outcome=(TestOutcome.from_str(outcome) if outcome else TestOutcome.SKIPPED),
                         start_time=report_time,
                         stop_time=report_end,
                         duration=getattr(report, "duration", None),
