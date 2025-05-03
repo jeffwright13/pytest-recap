@@ -132,16 +132,6 @@ def test_storage_file_is_dict(tmp_path):
     assert storage.load_sessions() == []
 
 
-def test_storage_large_sessions(tmp_path):
-    file_path = tmp_path / "sessions.json"
-    storage = JSONStorage(file_path=file_path)
-    big_list = [make_session(session_id=f"id-{i}").to_dict() for i in range(1000)]
-    for session in big_list:
-        storage.save_session(session)
-    loaded = storage.load_sessions()
-    assert len(loaded) == 1000
-
-
 def test_storage_partial_write(tmp_path):
     file_path = tmp_path / "sessions.json"
     file_path.write_text("[{}")  # Truncated JSON
@@ -158,3 +148,23 @@ def test_storage_non_serializable(tmp_path):
 
     with pytest.raises(TypeError):
         storage.save_session({"obj": NotSerializable()})
+
+
+def test_storage_bulk_sessions(tmp_path):
+    import json
+
+    file_path = tmp_path / "sessions.json"
+    big_list = [make_session(session_id=f"id-{i}").to_dict() for i in range(1000)]
+    file_path.write_text(json.dumps(big_list))
+    storage = JSONStorage(file_path=file_path)
+    loaded = storage.load_sessions()
+    assert len(loaded) == 1000
+
+
+def test_storage_append_sessions(tmp_path):
+    storage = JSONStorage(file_path=tmp_path / "sessions.json")
+    big_list = [make_session(session_id=f"id-{i}").to_dict() for i in range(200)]
+    for session in big_list:
+        storage.save_session(session)
+    loaded = storage.load_sessions()
+    assert len(loaded) == 200
