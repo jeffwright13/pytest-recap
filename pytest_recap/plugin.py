@@ -243,32 +243,49 @@ def write_recap_file(session, destination, terminalreporter):
     """
     recap_data = session.to_dict()
     now = datetime.now(timezone.utc)
+    json_bytes = json.dumps(recap_data, indent=2).encode("utf-8")
 
-    # Determine the output file path
-    if destination:
-        if os.path.isdir(destination) or destination.endswith("/"):
-            os.makedirs(destination, exist_ok=True)
-            filename = f"{now.strftime('%Y%m%d-%H%M%S')}_{session.sut_name}.json"
-            filepath = os.path.join(destination, filename)
-        else:
+    # Cloud URI detection and dispatch
+    if destination and (
+        str(destination).startswith("s3://")
+        or str(destination).startswith("gs://")
+        or str(destination).startswith("azure://")
+        or str(destination).startswith("https://")
+    ):
+        try:
+            from pytest_recap.cloud import upload_to_cloud
+
+            upload_to_cloud(destination, json_bytes)
             filepath = destination
-            parent_dir = os.path.dirname(filepath)
-            if parent_dir:
-                os.makedirs(parent_dir, exist_ok=True)
+        except Exception as e:
+            terminalreporter.write_line(f"RECAP PLUGIN ERROR (cloud upload): {e}")
+            raise
     else:
-        base_dir = os.environ.get("SESSION_WRITE_BASE_DIR", os.path.expanduser("~/.pytest_recap_sessions"))
-        date_dir = os.path.join(base_dir, now.strftime("%Y/%m"))
-        os.makedirs(date_dir, exist_ok=True)
-        filename = f"{now.strftime('%Y%m%d-%H%M%S')}_{session.sut_name}.json"
-        filepath = os.path.join(date_dir, filename)
-    try:
-        storage = JSONStorage(filepath)
-        storage.save_single_session(recap_data)
-    except Exception as e:
-        terminalreporter.write_line(f"RECAP PLUGIN ERROR: {e}")
-        raise
+        # Determine the output file path (local)
+        if destination:
+            if os.path.isdir(destination) or destination.endswith("/"):
+                os.makedirs(destination, exist_ok=True)
+                filename = f"{now.strftime('%Y%m%d-%H%M%S')}_{session.sut_name}.json"
+                filepath = os.path.join(destination, filename)
+            else:
+                filepath = destination
+                parent_dir = os.path.dirname(filepath)
+                if parent_dir:
+                    os.makedirs(parent_dir, exist_ok=True)
+        else:
+            base_dir = os.environ.get("SESSION_WRITE_BASE_DIR", os.path.expanduser("~/.pytest_recap_sessions"))
+            date_dir = os.path.join(base_dir, now.strftime("%Y/%m"))
+            os.makedirs(date_dir, exist_ok=True)
+            filename = f"{now.strftime('%Y%m%d-%H%M%S')}_{session.sut_name}.json"
+            filepath = os.path.join(date_dir, filename)
+        try:
+            storage = JSONStorage(filepath)
+            storage.save_single_session(recap_data)
+        except Exception as e:
+            terminalreporter.write_line(f"RECAP PLUGIN ERROR: {e}")
+            raise
 
-    # Write recap file path to terminal
+    # Write recap file path/URI to terminal
     terminalreporter.write_sep("=", "pytest-recap")
     BLUE = "\033[34m"
     RESET = "\033[0m"

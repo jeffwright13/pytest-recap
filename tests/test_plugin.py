@@ -271,3 +271,36 @@ def test_recap_session_tags_invalid(monkeypatch, tester, tmp_path):
         data = json.load(f)
     tags = data["session_tags"]
     assert tags == {}
+
+
+@pytest.mark.parametrize(
+    "cloud_uri",
+    [
+        "s3://mybucket/recap-session.json",
+        "gs://mybucket/recap-session.json",
+        "azure://mycontainer/recap-session.json",
+    ],
+)
+def test_recap_cloud_destination(monkeypatch, tester, mocker, cloud_uri):
+    """
+    Test that specifying a cloud URI as recap destination triggers cloud upload
+    and prints the URI in the terminal output.
+    """
+    mock_upload = mocker.patch("pytest_recap.cloud.upload_to_cloud")
+    monkeypatch.setenv("RECAP_ENABLE", "1")
+    monkeypatch.setenv("RECAP_DESTINATION", cloud_uri)
+    tester.makepyfile(
+        """
+        def test_dummy():
+            assert True
+        """
+    )
+    result = tester.runpytest()
+    result.assert_outcomes(passed=1)
+    # Ensure cloud upload was called with correct URI and bytes
+    assert mock_upload.called, f"Expected upload_to_cloud to be called for {cloud_uri}"
+    args, kwargs = mock_upload.call_args
+    assert args[0] == cloud_uri
+    assert isinstance(args[1], bytes)
+    # Ensure the terminal output mentions the cloud URI
+    assert cloud_uri in result.stdout.str()

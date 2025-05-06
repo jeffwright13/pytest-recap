@@ -4,151 +4,18 @@ Capture your test sessions. Recap the results.
 
 ## Overview
 
-**pytest-recap** is a [pytest](https://pytest.org/) plugin that captures detailed information about your test sessions and creates a well-structured JSON file writtten to the location of your choice. It is designed to help you analyze, summarize, and store test outcomes for reporting and analytics.
+**pytest-recap** is a [pytest](https://pytest.org/) plugin that captures detailed information about your test sessions and creates a well-structured JSON file written to the location of your choice. It is designed to help you analyze, summarize, and store test outcomes for reporting and analytics.
 
-<details>
-  <summary>Example JSON file</summary>
+### Key Features
 
-  ```json
-  {
-    "session_id": "20250503-074257_pytest-recap",
-    "sut_name": "pytest-recap",
-    "testing_system": {
-      "platform": "linux",
-      "python_version": "3.9.16",
-      "pytest_version": "8.3.5"
-    },
-    "session_start_time": "2025-05-03T07:42:57.123456+00:00",
-    "session_stop_time": "2025-05-03T07:43:01.654321+00:00",
-    "session_tags": {
-      "ci": "github",
-      "branch": "main"
-    },
-    "test_results": [
-      {
-        "nodeid": "demo-tests/orig/test_basic.py::test_basic_pass_1",
-        "outcome": "passed",
-        "start_time": "2025-05-03T07:42:58.111111+00:00",
-        "stop_time": "2025-05-03T07:42:58.211111+00:00",
-        "duration": 0.1,
-        "caplog": "DEBUG: some debug log",
-        "capstdout": "",
-        "capstderr": "",
-        "longreprtext": "",
-        "has_warning": false
-      },
-      {
-        "nodeid": "demo-tests/orig/test_basic.py::test_basic_fail_1",
-        "outcome": "failed",
-        "start_time": "2025-05-03T07:42:58.311111+00:00",
-        "stop_time": "2025-05-03T07:42:58.411111+00:00",
-        "duration": 0.1,
-        "caplog": "DEBUG: some debug log",
-        "capstdout": "",
-        "capstderr": "",
-        "longreprtext": "assert 1 == 2",
-        "has_warning": false
-      },
-      {
-        "nodeid": "demo-tests/orig/test_basic.py::test_basic_skip",
-        "outcome": "skipped",
-        "start_time": "2025-05-03T07:42:58.511111+00:00",
-        "stop_time": "2025-05-03T07:42:58.511111+00:00",
-        "duration": 0.0,
-        "caplog": "",
-        "capstdout": "",
-        "capstderr": "",
-        "longreprtext": "Skipped: Skipping this test with decorator.",
-        "has_warning": false
-      }
-    ],
-    "rerun_test_groups": [
-      {
-        "nodeid": "demo-tests/orig/test_basic.py::test_flaky",
-        "tests": [
-          {
-            "nodeid": "demo-tests/orig/test_basic.py::test_flaky",
-            "outcome": "rerun",
-            "start_time": "2025-05-03T07:42:59.000001+00:00",
-            "stop_time": "2025-05-03T07:42:59.100001+00:00",
-            "duration": 0.1,
-            "caplog": "",
-            "capstdout": "",
-            "capstderr": "",
-            "longreprtext": "",
-            "has_warning": false
-          },
-          {
-            "nodeid": "demo-tests/orig/test_basic.py::test_flaky",
-            "outcome": "passed",
-            "start_time": "2025-05-03T07:42:59.200001+00:00",
-            "stop_time": "2025-05-03T07:42:59.300001+00:00",
-            "duration": 0.1,
-            "caplog": "",
-            "capstdout": "",
-            "capstderr": "",
-            "longreprtext": "",
-            "has_warning": false
-          }
-        ]
-      }
-    ],
-    "warnings": [
-      {
-        "message": "ResourceWarning: unclosed file",
-        "category": "ResourceWarning",
-        "when": "call",
-        "nodeid": "demo-tests/orig/test_basic.py::test_basic_pass_1",
-        "location": ["demo-tests/orig/test_basic.py", 10, "test_basic_pass_1"]
-      }
-    ],
-    "errors": [],
-    "session_stats": {
-      "passed": 1,
-      "failed": 1,
-      "skipped": 1,
-      "rerun": 1,
-      "total": 4
-    }
-  }
-  ```
-</details>
+- **Comprehensive session recap**: Records all test outcomes, timings, logs, and more.
+- **Cloud storage support**: Write recaps directly to AWS S3 (`s3://`), Google Cloud Storage (`gs://`), or Azure Blob Storage (`azure://`).
+- **Flexible output**: Supports local file, directory, or cloud URI destinations.
+- **Rerun group tracking**: Handles flaky/rerun tests with group summaries.
+- **Color-highlighted output**: Recap file path/URI is colorized in the terminal.
+- **Tested with pytest-mock and moto**: Full test suite with cloud mocks and coverage.
 
-## Features
-- Provides a JSON-serialized summary of test sessions
-- Captures all test outcomes, reruns, warnings and session metadata
-
-## Recap File Storage Modes
-
-Pytest-recap supports two recap file storage modes:
-
-- **Single-session mode (default for plugin output):**
-  - Each recap file contains a single test session as a JSON object (dict).
-  - Used when specifying a `--recap-destination` file or allowing the plugin to write a session recap.
-  - Example output:
-
-    ```json
-    {
-      "session_id": "pytest-recap-20250503-141259",
-      "session_tags": {"ci": "github", "branch": "main"},
-      ...
-    }
-    ```
-
-- **Multi-session/archive mode:**
-  - Used internally and for archival/testing purposes.
-  - Each recap file contains a list of session objects.
-  - Appending sessions is supported.
-  - Example output:
-
-    ```json
-    [
-      {"session_id": "id-1", ...},
-      {"session_id": "id-2", ...}
-    ]
-    ```
-
-The plugin always writes recap files as a single dict. The storage backend (`JSONStorage`) supports both modes for flexibility and testability.
+---
 
 ## Installation
 
@@ -156,87 +23,64 @@ The plugin always writes recap files as a single dict. The storage backend (`JSO
 uv pip install pytest-recap
 ```
 
-Or install from source:
+For cloud storage support in tests:
+- S3: `uv add --dev moto boto3`
+- GCS: `uv add --dev google-cloud-storage`
+- Azure: `uv add --dev azure-storage-blob`
 
-```bash
-git clone https://github.com/yourusername/pytest-recap.git
-cd pytest-recap
-uv pip install . -e
-```
+---
 
 ## Usage
 
-Simply add `pytest-recap` to your test environment/venv. The plugin will automatically capture test session data when you run pytest with the `--recap` option enabled.
+Run pytest as usual. Recap output is written to `recap-session.json` by default, or to a custom file/directory/cloud URI using the `--recap-destination` option.
 
 ```bash
-pytest --recap
+pytest --recap-destination=gs://mybucket/recap-session.json
+pytest --recap-destination=azure://mycontainer/recap-session.json
+pytest --recap-destination=./output_dir/
 ```
 
-Session data will be captured and can be accessed or exported as needed. Look in the terminal for the location your file was written to:
+### Example Recap JSON
 
-```bash
-Pytest Recap session written to: /tmp/pytest_recap_sessions/2025/05/20250503-070851_pytest-recap.json
-```
+<details>
+  <summary>Show Example</summary>
 
-You can specify a custom location for the session file using the `--recap-destination` option:
+  ```json
+  {
+    "session_id": "20250503-074257_pytest-recap",
+    ...
+    "test_results": [ ... ],
+    "rerun_test_groups": [ ... ]
+  }
+  ```
+</details>
 
-```bash
-pytest --recap --recap-destination=/path/to/your/session/file.json
-```
+---
 
-### CI/Environment Variable Support
+## Cloud Storage Configuration
 
-You can also control pytest-recap via environment variables, which is especially useful for CI servers:
+- **AWS S3**: Requires `boto3` and valid AWS credentials (see [boto3 docs](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/credentials.html)).
+- **Google Cloud Storage**: Requires `google-cloud-storage` and valid GCP credentials (see [GCP auth docs](https://cloud.google.com/docs/authentication/getting-started)).
+- **Azure Blob Storage**: Requires `azure-storage-blob` and valid Azure credentials (see [Azure auth docs](https://learn.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage)).
 
-| Environment Variable           | Description                                                | Example Value                     |
-|-------------------------------|------------------------------------------------------------|-----------------------------------|
-| `RECAP_ENABLE`         | Enable recap plugin (same as `--recap`)                    | `1`, `true`, `yes`                |
-| `RECAP_DESTINATION`    | Output file or directory (same as `--recap-destination`)   | `/tmp/my-recap.json`              |
-| `RECAP_ENV`                   | Specifies the environment (e.g., `staging`, `prod`). Default is `test`. | `staging`                         |
-| `RECAP_SESSION_TAGS`          | JSON string for additional session tags. Must be a JSON object (dict). If invalid, an empty dictionary `{}` is used and a warning is printed. | `{"env": "ci", "branch": "main"}` |
+---
 
-- CLI flags always take precedence over environment variables.
-- If neither is set, recap is disabled by default.
+## Development & Testing
 
-**Example (CI/CD):**
+- Dev dependencies: `uv pip install -r requirements-dev.txt` or use `uv add --dev ...` as above.
+- Run all tests: `uv run pytest tests -v`
+- S3 tests require `moto` and `boto3` (optional; skipped if not installed).
+- GCS/Azure tests use direct mocking for fast, dependency-light testing.
+- Pre-commit hooks: see `.pre-commit-config.yaml` for ruff, pytest-check, etc.
 
-```bash
-export RECAP_ENABLE=1
-export RECAP_DESTINATION=/tmp/ci-session.json
-export RECAP_ENV=ci
-export RECAP_SESSION_TAGS='{"env": "ci", "branch": "main"}'
-pytest
-```
+---
 
-## Error Handling
+## Changelog
 
-- If `RECAP_SESSION_TAGS` is not a valid JSON object, the plugin will print a warning and use an empty dictionary `{}` for session tags.
-- Recap files are always written, even if environment variables are invalid.
+See [CHANGELOG.md](CHANGELOG.md) for release notes and version history.
 
-## Development
-
-Install development dependencies:
-
-```bash
-uv pip install .[dev]
-```
-
-Run tests and check coverage:
-
-```bash
-pytest -v tests/
-```
-
-Format and lint code:
-
-```bash
-ruff check pytest_recap
-```
+---
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
-
-## Author
-
-Jeff Wright (<jeff.washcloth@gmail.com>)
+MIT License. Copyright (c) 2025 Jeff Wright.
