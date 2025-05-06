@@ -172,7 +172,6 @@ def test_testsession_add_and_to_from_dict():
         session_id="abc123",
         session_start_time=start,
         session_stop_time=stop,
-        session_duration=None,
         session_tags={"env": "dev"},
         rerun_test_groups=[group],
         test_results=[tr],
@@ -200,7 +199,6 @@ def test_testsession_empty():
         session_id=None,
         session_start_time=start,
         session_stop_time=stop,
-        session_duration=None,
         session_tags=None,
         rerun_test_groups=[],
         test_results=[],
@@ -225,50 +223,6 @@ def test_testsession_from_dict_missing_fields():
     assert session.session_stop_time == stop
     assert session.test_results == []
     assert session.rerun_test_groups == []
-
-
-def test_testsession_both_stop_and_duration_match(caplog):
-    start = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
-    duration = 10.0
-    stop = start + timedelta(seconds=duration)
-    with caplog.at_level("WARNING"):
-        session = TestSession(
-            sut_name="test",
-            testing_system=None,
-            session_id="id",
-            session_start_time=start,
-            session_stop_time=stop,
-            session_duration=duration,
-            session_tags=None,
-            rerun_test_groups=[],
-            test_results=[],
-        )
-    # stop_time wins, duration is recomputed
-    assert session.session_stop_time == stop
-    assert session.session_duration == duration
-    assert any("Ignoring session_duration" in r.message for r in caplog.records)
-
-
-def test_testsession_both_stop_and_duration_mismatch(caplog):
-    start = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
-    duration = 10.0
-    stop = start + timedelta(seconds=8)  # mismatch
-    with caplog.at_level("WARNING"):
-        session = TestSession(
-            sut_name="test",
-            testing_system=None,
-            session_id="id",
-            session_start_time=start,
-            session_stop_time=stop,
-            session_duration=duration,
-            session_tags=None,
-            rerun_test_groups=[],
-            test_results=[],
-        )
-    # stop_time wins, duration is recomputed
-    assert session.session_stop_time == stop
-    assert session.session_duration == 8.0
-    assert any("Ignoring session_duration" in r.message for r in caplog.records)
 
 
 def test_testoutcome_all_enum_members():
@@ -460,55 +414,6 @@ def test_reruntestgroup_from_dict_invalid():
         RerunTestGroup.from_dict([1, 2, 3])
 
 
-def test_testsession_post_init_logic():
-    from datetime import datetime, timedelta, timezone
-
-    import pytest
-    from pytest_recap.models import TestSession
-
-    now = datetime.now(timezone.utc)
-    # Error if both stop_time and duration missing
-    with pytest.raises(ValueError):
-        TestSession(
-            sut_name="test",
-            testing_system={},
-            session_id="id",
-            session_start_time=now,
-            session_stop_time=None,
-            session_duration=None,
-            session_tags={},
-            rerun_test_groups=[],
-            test_results=[],
-        )
-    # duration computed from stop_time
-    stop = now + timedelta(seconds=3)
-    session = TestSession(
-        sut_name="test",
-        testing_system={},
-        session_id="id",
-        session_start_time=now,
-        session_stop_time=stop,
-        session_duration=None,
-        session_tags={},
-        rerun_test_groups=[],
-        test_results=[],
-    )
-    assert session.session_duration == 3.0
-    # stop_time computed from duration
-    session = TestSession(
-        sut_name="test",
-        testing_system={},
-        session_id="id",
-        session_start_time=now,
-        session_stop_time=None,
-        session_duration=2.0,
-        session_tags={},
-        rerun_test_groups=[],
-        test_results=[],
-    )
-    assert abs((session.session_stop_time - now).total_seconds() - 2.0) < 0.01
-
-
 def test_testsession_to_and_from_dict():
     from datetime import datetime, timezone
 
@@ -523,7 +428,6 @@ def test_testsession_to_and_from_dict():
         session_id="id",
         session_start_time=now,
         session_stop_time=now,
-        session_duration=0.0,
         session_tags={"env": "ci"},
         rerun_test_groups=[group],
         test_results=[r1],
@@ -549,7 +453,6 @@ def test_testsession_add_test_result_and_rerun_group():
         session_id="id",
         session_start_time=now,
         session_stop_time=now,
-        session_duration=0.0,
         session_tags={},
         rerun_test_groups=[],
         test_results=[],
@@ -575,7 +478,6 @@ def test_testsession_add_test_result_invalid():
         session_id="id",
         session_start_time=now,
         session_stop_time=now,
-        session_duration=0.0,
         session_tags={},
         rerun_test_groups=[],
         test_results=[],
@@ -597,7 +499,6 @@ def test_testsession_add_rerun_group_invalid():
         session_id="id",
         session_start_time=now,
         session_stop_time=now,
-        session_duration=0.0,
         session_tags={},
         rerun_test_groups=[],
         test_results=[],

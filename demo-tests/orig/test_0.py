@@ -74,9 +74,7 @@ def test0_fail_1(logger):
     assert 1 == 2
 
 
-pytest.mark.skip(reason="Skipping this test with decorator.")
-
-
+@pytest.mark.skip(reason="Skipping this test with decorator.")
 def test0_skip(logger):
     assert True
 

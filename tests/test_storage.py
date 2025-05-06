@@ -24,7 +24,6 @@ def make_session(session_id="test-123", start=None, stop=None):
         session_id=session_id,
         session_start_time=start,
         session_stop_time=stop,
-        session_duration=None,
         session_tags={"env": "dev"},
         rerun_test_groups=[],
         test_results=[tr],

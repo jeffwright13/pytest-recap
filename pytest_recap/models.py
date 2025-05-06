@@ -2,16 +2,18 @@
 
 Core models:
 1. TestOutcome - Enum for test result outcomes
-2. TestResult - Single test execution result
-3. TestSession - Collection of test results with metadata
-4. RerunTestGroup - Group of related test reruns
+2. SessionStats - Aggregates test outcome statistics for a single session
+3. TestResult - Single test execution result
+4. TestSession - Collection of test results with metadata
+5. RerunTestGroup - Group of related test reruns
 """
 
 import logging
+from collections import Counter
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -256,56 +258,77 @@ class RerunTestGroup:
         return group
 
 
+class SessionStats:
+    """Aggregates test outcome statistics for a session."""
+
+    def __init__(self, test_results):
+        """
+        Args:
+            test_results (Iterable[TestResult]): List of TestResult objects.
+        """
+        self.counter = Counter(
+            str(getattr(test_result, "outcome", test_result)).lower() for test_result in test_results
+        )
+        self.total = len(test_results)
+
+    def count(self, outcome):
+        """Return the count for a given outcome (case-insensitive string)."""
+        return self.counter.get(str(outcome).lower(), 0)
+
+    def as_dict(self):
+        """Return all outcome counts as a dict."""
+        return dict(self.counter)
+
+    def __str__(self):
+        return f"SessionStats(total={self.total}, {dict(self.counter)})"
+
+
 @dataclass
 class TestSession:
     """
-    Represents a single test session for a single SUT.
+    Represents a test session recap with session-level metadata, results, warnings, and errors.
 
     Attributes:
-        sut_name (str): Name of the system under test.
-        testing_system (Dict[str, Any]): Metadata about the testing system.
         session_id (str): Unique session identifier.
         session_start_time (datetime): Start time of the session.
-        session_stop_time (Optional[datetime]): Stop time of the session.
-        session_duration (Optional[float]): Duration of the session in seconds.
-        atta (Dict[str, str]): Arbitrary tags for the session.
-        rerun_test_groups (List[RerunTestGroup]): Groups of rerun tests.
+        session_stop_time (datetime): Stop time of the session.
+        sut_name (str): Name of the system under test.
+        session_tags (Dict[str, str]): Arbitrary tags for the session.
+        testing_system (Dict[str, Any]): Metadata about the testing system.
         test_results (List[TestResult]): List of test results in the session.
+        rerun_test_groups (List[RerunTestGroup]): Groups of rerun tests.
+        warnings (List[Any]): List of session-level warnings.
+        errors (List[Any]): List of session-level errors.
+        session_stats (SessionStats): Session statistics.
     """
 
     __test__ = False  # Tell Pytest this is NOT a test class
 
-    sut_name: str = ""
-    testing_system: Dict[str, Any] = field(default_factory=dict)
-    session_id: str = ""
-    session_start_time: datetime = None
-    session_stop_time: Optional[datetime] = None
-    session_duration: Optional[float] = None
-    session_tags: Dict[str, str] = field(default_factory=dict)
-    rerun_test_groups: List[RerunTestGroup] = field(default_factory=list)
-    test_results: List[TestResult] = field(default_factory=list)
-
-    def __post_init__(self):
-        """
-        Calculate timing information once at initialization.
-        """
-        # Always set a start time
-        if self.session_start_time is None:
-            self.session_start_time = datetime.now(timezone.utc)
-        # Require at least one of stop_time or duration
-        if self.session_stop_time is None and self.session_duration is None:
-            raise ValueError("Either session_stop_time or session_duration must be provided")
-        if self.session_stop_time is None:
-            self.session_stop_time = self.session_start_time + timedelta(seconds=self.session_duration)
-        elif self.session_duration is None:
-            self.session_duration = (self.session_stop_time - self.session_start_time).total_seconds()
-        else:
-            # Both are provided: ignore duration, use stop_time, log a warning
-            logger.warning(
-                "Both session_stop_time and session_duration provided. "
-                "Ignoring session_duration and using session_stop_time as authoritative."
-            )
-            self.session_duration = (self.session_stop_time - self.session_start_time).total_seconds()
+    def __init__(
+        self,
+        session_id: str,
+        session_start_time: datetime,
+        session_stop_time: datetime = None,
+        sut_name: str = None,
+        session_tags: dict = None,
+        testing_system: dict = None,
+        test_results: list = None,
+        rerun_test_groups: list = None,
+        warnings: list = None,
+        errors: list = None,
+        session_stats: SessionStats = None,
+    ):
+        self.session_id = session_id
+        self.session_start_time = session_start_time
+        self.session_stop_time = session_stop_time or datetime.utcnow()
+        self.sut_name = sut_name
+        self.session_tags = session_tags or {}
+        self.testing_system = testing_system or {}
+        self.test_results = test_results or []
+        self.rerun_test_groups = rerun_test_groups or []
+        self.warnings = warnings or []
+        self.errors = errors or []
+        self.session_stats = session_stats or SessionStats(self.test_results)
 
     def to_dict(self) -> Dict:
         """
@@ -319,7 +342,6 @@ class TestSession:
             "session_tags": self.session_tags or {},
             "session_start_time": self.session_start_time.isoformat(),
             "session_stop_time": self.session_stop_time.isoformat(),
-            "session_duration": self.session_duration,
             "sut_name": self.sut_name,
             "testing_system": self.testing_system or {},
             "test_results": [test.to_dict() for test in self.test_results],
@@ -327,6 +349,9 @@ class TestSession:
                 {"nodeid": group.nodeid, "tests": [t.to_dict() for t in group.tests]}
                 for group in self.rerun_test_groups
             ],
+            "warnings": self.warnings,
+            "errors": self.errors,
+            "session_stats": self.session_stats.as_dict() if self.session_stats else {},
         }
 
     @classmethod
@@ -334,31 +359,26 @@ class TestSession:
         """Create a TestSession from a dictionary."""
         if not isinstance(d, dict):
             raise ValueError(f"Invalid data for TestSession. Expected dict, got {type(d)}")
-
-        # Convert datetime strings to datetime objects
         session_start_time = d.get("session_start_time")
         if isinstance(session_start_time, str):
             session_start_time = datetime.fromisoformat(session_start_time)
-
         session_stop_time = d.get("session_stop_time")
         if isinstance(session_stop_time, str):
             session_stop_time = datetime.fromisoformat(session_stop_time)
-
-        test_results = [TestResult.from_dict(tr_dict) for tr_dict in d.get("test_results", [])]
-
-        rerun_test_groups = [RerunTestGroup.from_dict(group_dict) for group_dict in d.get("rerun_test_groups", [])]
-
-        # Create the TestSession with proper datetime objects
+        test_results = [TestResult.from_dict(tr) for tr in d.get("test_results", [])]
+        session_stats = SessionStats(test_results)
         return cls(
-            sut_name=d.get("sut_name"),
-            testing_system=d.get("testing_system", {}),
             session_id=d.get("session_id"),
             session_start_time=session_start_time,
             session_stop_time=session_stop_time,
-            session_duration=d.get("session_duration"),
+            sut_name=d.get("sut_name"),
             session_tags=d.get("session_tags", {}),
-            rerun_test_groups=rerun_test_groups,
+            testing_system=d.get("testing_system", {}),
             test_results=test_results,
+            rerun_test_groups=[RerunTestGroup.from_dict(g) for g in d.get("rerun_test_groups", [])],
+            warnings=d.get("warnings", []),
+            errors=d.get("errors", []),
+            session_stats=session_stats,
         )
 
     def add_test_result(self, result: TestResult) -> None:

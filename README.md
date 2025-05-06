@@ -103,6 +103,38 @@ Capture your test sessions. Recap the results.
 - Provides a JSON-serialized summary of test sessions
 - Handles rerun and flaky test tracking
 
+## Recap File Storage Modes
+
+Pytest-recap supports two recap file storage modes:
+
+- **Single-session mode (default for plugin output):**
+  - Each recap file contains a single test session as a JSON object (dict).
+  - Used when specifying a `--recap-destination` file or allowing the plugin to write a session recap.
+  - Example output:
+
+    ```json
+    {
+      "session_id": "pytest-recap-20250503-141259",
+      "session_tags": {"ci": "github", "branch": "main"},
+      ...
+    }
+    ```
+
+- **Multi-session/archive mode:**
+  - Used internally and for archival/testing purposes.
+  - Each recap file contains a list of session objects.
+  - Appending sessions is supported.
+  - Example output:
+
+    ```json
+    [
+      {"session_id": "id-1", ...},
+      {"session_id": "id-2", ...}
+    ]
+    ```
+
+The plugin always writes recap files as a single dict. The storage backend (`JSONStorage`) supports both modes for flexibility and testability.
+
 ## Installation
 
 ```bash
@@ -125,17 +157,46 @@ Simply add `pytest-recap` to your test environment/venv. The plugin will automat
 pytest --recap
 ```
 
-Session data will be captured and can be accessed or exported as needed. Look in ther terminal for the location your file was written to:
+Session data will be captured and can be accessed or exported as needed. Look in the terminal for the location your file was written to:
 
 ```bash
 Pytest Recap session written to: /tmp/pytest_recap_sessions/2025/05/20250503-070851_pytest-recap.json
 ```
 
-You can specify a custom location for the session file using the `--recap-file` option:
+You can specify a custom location for the session file using the `--recap-destination` option:
 
 ```bash
-pytest --recap --recap-file=/path/to/your/session/file.json
+pytest --recap --recap-destination=/path/to/your/session/file.json
 ```
+
+### CI/Environment Variable Support
+
+You can also control pytest-recap via environment variables, which is especially useful for CI servers:
+
+| Environment Variable           | Description                                                | Example Value                     |
+|-------------------------------|------------------------------------------------------------|-----------------------------------|
+| `RECAP_ENABLE`         | Enable recap plugin (same as `--recap`)                    | `1`, `true`, `yes`                |
+| `RECAP_DESTINATION`    | Output file or directory (same as `--recap-destination`)   | `/tmp/my-recap.json`              |
+| `RECAP_ENV`                   | Specifies the environment (e.g., `staging`, `prod`). Default is `test`. | `staging`                         |
+| `RECAP_SESSION_TAGS`          | JSON string for additional session tags. Must be a JSON object (dict). If invalid, an empty dictionary `{}` is used and a warning is printed. | `{"env": "ci", "branch": "main"}` |
+
+- CLI flags always take precedence over environment variables.
+- If neither is set, recap is disabled by default.
+
+**Example (CI/CD):**
+
+```bash
+export RECAP_ENABLE=1
+export RECAP_DESTINATION=/tmp/ci-session.json
+export RECAP_ENV=ci
+export RECAP_SESSION_TAGS='{"env": "ci", "branch": "main"}'
+pytest
+```
+
+## Error Handling
+
+- If `RECAP_SESSION_TAGS` is not a valid JSON object, the plugin will print a warning and use an empty dictionary `{}` for session tags.
+- Recap files are always written, even if environment variables are invalid.
 
 ## Development
 
