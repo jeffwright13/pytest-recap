@@ -2,7 +2,7 @@
 
 Core models:
 1. TestOutcome - Enum for test result outcomes
-2. SessionStats - Aggregates test outcome statistics for a single session
+2. TestSessionStats - Aggregates test outcome statistics for a single session
 3. TestResult - Single test execution result
 4. TestSession - Collection of test results with metadata
 5. RerunTestGroup - Group of related test reruns
@@ -258,7 +258,8 @@ class RerunTestGroup:
         return group
 
 
-class SessionStats:
+class TestSessionStats:
+    __test__ = False
     """Aggregates test outcome statistics for a session."""
 
     def __init__(self, test_results):
@@ -280,7 +281,7 @@ class SessionStats:
         return dict(self.counter)
 
     def __str__(self):
-        return f"SessionStats(total={self.total}, {dict(self.counter)})"
+        return f"TestSessionStats(total={self.total}, {dict(self.counter)})"
 
 
 @dataclass
@@ -299,7 +300,7 @@ class TestSession:
         rerun_test_groups (List[RerunTestGroup]): Groups of rerun tests.
         warnings (List[Any]): List of session-level warnings.
         errors (List[Any]): List of session-level errors.
-        session_stats (SessionStats): Session statistics.
+        session_stats (TestSessionStats): Test session statistics.
     """
 
     __test__ = False  # Tell Pytest this is NOT a test class
@@ -316,7 +317,7 @@ class TestSession:
         rerun_test_groups: list = None,
         warnings: list = None,
         errors: list = None,
-        session_stats: SessionStats = None,
+        session_stats: TestSessionStats = None,
     ):
         self.session_id = session_id
         self.session_start_time = session_start_time
@@ -328,7 +329,7 @@ class TestSession:
         self.rerun_test_groups = rerun_test_groups or []
         self.warnings = warnings or []
         self.errors = errors or []
-        self.session_stats = session_stats or SessionStats(self.test_results)
+        self.session_stats = session_stats or TestSessionStats(self.test_results)
 
     def to_dict(self) -> Dict:
         """
@@ -366,7 +367,7 @@ class TestSession:
         if isinstance(session_stop_time, str):
             session_stop_time = datetime.fromisoformat(session_stop_time)
         test_results = [TestResult.from_dict(tr) for tr in d.get("test_results", [])]
-        session_stats = SessionStats(test_results)
+        session_stats = TestSessionStats(test_results)
         return cls(
             session_id=d.get("session_id"),
             session_start_time=session_start_time,

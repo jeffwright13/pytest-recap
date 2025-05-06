@@ -243,6 +243,7 @@ def write_recap_file(session, destination, terminalreporter):
     """
     recap_data = session.to_dict()
     now = datetime.now(timezone.utc)
+
     # Determine the output file path
     if destination:
         if os.path.isdir(destination) or destination.endswith("/"):
@@ -266,8 +267,13 @@ def write_recap_file(session, destination, terminalreporter):
     except Exception as e:
         terminalreporter.write_line(f"RECAP PLUGIN ERROR: {e}")
         raise
-    terminalreporter.write_sep("-")
-    terminalreporter.write_line(f"Pytest Recap session written to: {filepath}")
+
+    # Write recap file path to terminal
+    terminalreporter.write_sep("=", "pytest-recap")
+    BLUE = "\033[34m"
+    RESET = "\033[0m"
+    blue_path = f"Recap JSON written to: {BLUE}{filepath}{RESET}"
+    terminalreporter.write_line(blue_path)
 
 
 @pytest.hookimpl(hookwrapper=True)

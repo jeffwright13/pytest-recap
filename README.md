@@ -20,7 +20,6 @@ Capture your test sessions. Recap the results.
     },
     "session_start_time": "2025-05-03T07:42:57.123456+00:00",
     "session_stop_time": "2025-05-03T07:43:01.654321+00:00",
-    "session_duration": 4.53,
     "session_tags": {
       "ci": "github",
       "branch": "main"
@@ -93,15 +92,31 @@ Capture your test sessions. Recap the results.
           }
         ]
       }
-    ]
+    ],
+    "warnings": [
+      {
+        "message": "ResourceWarning: unclosed file",
+        "category": "ResourceWarning",
+        "when": "call",
+        "nodeid": "demo-tests/orig/test_basic.py::test_basic_pass_1",
+        "location": ["demo-tests/orig/test_basic.py", 10, "test_basic_pass_1"]
+      }
+    ],
+    "errors": [],
+    "session_stats": {
+      "passed": 1,
+      "failed": 1,
+      "skipped": 1,
+      "rerun": 1,
+      "total": 4
+    }
   }
   ```
 </details>
 
 ## Features
-- Captures all test outcomes, reruns, and session metadata
 - Provides a JSON-serialized summary of test sessions
-- Handles rerun and flaky test tracking
+- Captures all test outcomes, reruns, warnings and session metadata
 
 ## Recap File Storage Modes
 
