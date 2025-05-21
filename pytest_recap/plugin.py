@@ -188,10 +188,10 @@ def build_recap_session(test_results, session_start, session_end, warnings, reru
     from pytest_recap.models import TestResult
 
     hostname = socket.gethostname()
-    sut_name = os.environ.get("SBP_QA_NAME") or "pytest-recap"
+    system_under_test = {"name": os.environ.get("SBP_QA_NAME") or "pytest-recap"}
     testing_system_name = hostname
     session_timestamp = session_start.strftime("%Y%m%d-%H%M%S")
-    session_id = f"{sut_name}-{session_timestamp}-{str(uuid.uuid4())[:8]}".lower()
+    session_id = f"{system_under_test.get('name', 'sut')}-{session_timestamp}-{str(uuid.uuid4())[:8]}".lower()
     # Session tags logic (can be improved or made more dynamic)
     tags_env = os.environ.get("RECAP_SESSION_TAGS")
     if not tags_env:
@@ -210,7 +210,7 @@ def build_recap_session(test_results, session_start, session_end, warnings, reru
     session = TestSession(
         session_id=session_id,
         session_tags=session_tags,
-        sut_name=sut_name,
+        system_under_test=system_under_test,
         testing_system={
             "hostname": hostname,
             "name": testing_system_name,
@@ -265,7 +265,7 @@ def write_recap_file(session, destination, terminalreporter):
         if destination:
             if os.path.isdir(destination) or destination.endswith("/"):
                 os.makedirs(destination, exist_ok=True)
-                filename = f"{now.strftime('%Y%m%d-%H%M%S')}_{session.sut_name}.json"
+                filename = f"{now.strftime('%Y%m%d-%H%M%S')}_{getattr(session, 'system_under_test', {}).get('name', 'sut')}.json"
                 filepath = os.path.join(destination, filename)
             else:
                 filepath = destination
@@ -276,7 +276,9 @@ def write_recap_file(session, destination, terminalreporter):
             base_dir = os.environ.get("SESSION_WRITE_BASE_DIR", os.path.expanduser("~/.pytest_recap_sessions"))
             date_dir = os.path.join(base_dir, now.strftime("%Y/%m"))
             os.makedirs(date_dir, exist_ok=True)
-            filename = f"{now.strftime('%Y%m%d-%H%M%S')}_{session.sut_name}.json"
+            filename = (
+                f"{now.strftime('%Y%m%d-%H%M%S')}_{getattr(session, 'system_under_test', {}).get('name', 'sut')}.json"
+            )
             filepath = os.path.join(date_dir, filename)
         try:
             storage = JSONStorage(filepath)

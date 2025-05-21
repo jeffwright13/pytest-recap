@@ -167,7 +167,7 @@ def test_testsession_add_and_to_from_dict():
     group = RerunTestGroup(nodeid="foo")
     group.add_test(tr)
     session = TestSession(
-        sut_name="my-sut",
+        system_under_test={"name": "my-sut"},
         testing_system={"host": "localhost"},
         session_id="abc123",
         session_start_time=start,
@@ -177,11 +177,11 @@ def test_testsession_add_and_to_from_dict():
         test_results=[tr],
     )
     d = session.to_dict()
-    assert d["sut_name"] == "my-sut"
+    assert d["system_under_test"]["name"] == "my-sut"
     assert d["session_id"] == "abc123"
     assert d["testing_system"]["host"] == "localhost"
     session2 = TestSession.from_dict(d)
-    assert session2.sut_name == "my-sut"
+    assert session2.system_under_test["name"] == "my-sut"
     assert session2.session_id == "abc123"
     assert session2.testing_system["host"] == "localhost"
     assert session2.test_results[0].nodeid == "foo"
@@ -194,7 +194,7 @@ def test_testsession_empty():
     start = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
     stop = start + timedelta(seconds=10)
     session = TestSession(
-        sut_name=None,
+        system_under_test=None,
         testing_system=None,
         session_id=None,
         session_start_time=start,
@@ -423,7 +423,7 @@ def test_testsession_to_and_from_dict():
     r1 = TestResult("foo", TestOutcome.PASSED, now, now, 0.0)
     group = RerunTestGroup(nodeid="foo", tests=[r1])
     session = TestSession(
-        sut_name="test",
+        system_under_test={"name": "test"},
         testing_system={"platform": "linux"},
         session_id="id",
         session_start_time=now,
@@ -434,7 +434,7 @@ def test_testsession_to_and_from_dict():
     )
     d = session.to_dict()
     restored = TestSession.from_dict(d)
-    assert restored.sut_name == "test"
+    assert restored.system_under_test["name"] == "test"
     assert restored.testing_system["platform"] == "linux"
     assert restored.session_tags["env"] == "ci"
     assert len(restored.rerun_test_groups) == 1
@@ -448,7 +448,7 @@ def test_testsession_add_test_result_and_rerun_group():
 
     now = datetime.now(timezone.utc)
     session = TestSession(
-        sut_name="test",
+        system_under_test={"name": "test"},
         testing_system={},
         session_id="id",
         session_start_time=now,
@@ -473,7 +473,7 @@ def test_testsession_add_test_result_invalid():
 
     now = datetime.now(timezone.utc)
     session = TestSession(
-        sut_name="test",
+        system_under_test={"name": "test"},
         testing_system={},
         session_id="id",
         session_start_time=now,
@@ -494,7 +494,7 @@ def test_testsession_add_rerun_group_invalid():
 
     now = datetime.now(timezone.utc)
     session = TestSession(
-        sut_name="test",
+        system_under_test={"name": "test"},
         testing_system={},
         session_id="id",
         session_start_time=now,

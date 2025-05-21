@@ -277,10 +277,21 @@ class TestSessionStats:
         return self.counter.get(str(outcome).lower(), 0)
 
     def as_dict(self):
-        """Return all outcome counts as a dict."""
+        """
+        Return all outcome counts as a dict.
+
+        Returns:
+            dict: Dictionary of outcome counts.
+        """
         return dict(self.counter)
 
     def __str__(self):
+        """
+        Return a string representation of the TestSessionStats object.
+
+        Returns:
+            str: String representation of the TestSessionStats object.
+        """
         return f"TestSessionStats(total={self.total}, {dict(self.counter)})"
 
 
@@ -293,7 +304,7 @@ class TestSession:
         session_id (str): Unique session identifier.
         session_start_time (datetime): Start time of the session.
         session_stop_time (datetime): Stop time of the session.
-        sut_name (str): Name of the system under test.
+        system_under_test (dict): Information about the system under test (user-extensible).
         session_tags (Dict[str, str]): Arbitrary tags for the session.
         testing_system (Dict[str, Any]): Metadata about the testing system.
         test_results (List[TestResult]): List of test results in the session.
@@ -310,7 +321,7 @@ class TestSession:
         session_id: str,
         session_start_time: datetime,
         session_stop_time: datetime = None,
-        sut_name: str = None,
+        system_under_test: dict = None,
         session_tags: dict = None,
         testing_system: dict = None,
         test_results: list = None,
@@ -322,7 +333,7 @@ class TestSession:
         self.session_id = session_id
         self.session_start_time = session_start_time
         self.session_stop_time = session_stop_time or datetime.utcnow()
-        self.sut_name = sut_name
+        self.system_under_test = system_under_test or {}
         self.session_tags = session_tags or {}
         self.testing_system = testing_system or {}
         self.test_results = test_results or []
@@ -343,7 +354,7 @@ class TestSession:
             "session_tags": self.session_tags or {},
             "session_start_time": self.session_start_time.isoformat(),
             "session_stop_time": self.session_stop_time.isoformat(),
-            "sut_name": self.sut_name,
+            "system_under_test": self.system_under_test or {},
             "testing_system": self.testing_system or {},
             "test_results": [test.to_dict() for test in self.test_results],
             "rerun_test_groups": [
@@ -372,7 +383,7 @@ class TestSession:
             session_id=d.get("session_id"),
             session_start_time=session_start_time,
             session_stop_time=session_stop_time,
-            sut_name=d.get("sut_name"),
+            system_under_test=d.get("system_under_test", {}),
             session_tags=d.get("session_tags", {}),
             testing_system=d.get("testing_system", {}),
             test_results=test_results,

@@ -19,7 +19,7 @@ def make_session(session_id="test-123", start=None, stop=None):
         duration=2,
     )
     return TestSession(
-        sut_name="my-sut",
+        system_under_test={"name": "my-sut"},
         testing_system={"host": "localhost"},
         session_id=session_id,
         session_start_time=start,
@@ -113,15 +113,19 @@ def test_storage_file_is_directory(tmp_path):
 
 
 def test_storage_permission_error(tmp_path):
+    import pytest
+
     file_path = tmp_path / "sessions.json"
     file_path.write_text("[]")
-    file_path.chmod(0o000)  # Remove all permissions
-    storage = JSONStorage(file_path=file_path)
+    # Make the directory unwritable
+    tmp_path.chmod(0o500)
     try:
+        storage = JSONStorage(file_path=file_path)
         with pytest.raises(PermissionError):
             storage.save_session({"foo": "bar"})
     finally:
-        file_path.chmod(0o600)
+        # Restore permissions so pytest can clean up
+        tmp_path.chmod(0o700)
 
 
 def test_storage_file_is_dict(tmp_path):
