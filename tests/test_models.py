@@ -295,13 +295,13 @@ def test_testresult_minimal_and_full():
         capstdout="stdout",
         longreprtext="long",
         has_warning=True,
+        has_error=True,
     )
     d = result.to_dict()
     restored = TestResult.from_dict(d)
     assert restored.nodeid == "bar"
     assert restored.outcome == TestOutcome.FAILED
     assert restored.caplog == "log"
-    assert restored.has_warning is True
 
 
 def test_testresult_post_init_duration_and_stop_time():

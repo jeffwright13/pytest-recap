@@ -1,10 +1,11 @@
+import ast
 import json
 import os
 import platform
 import socket
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import pytest
 from _pytest.config import Config
@@ -12,11 +13,9 @@ from _pytest.config.argparsing import Parser
 from _pytest.reports import TestReport
 from _pytest.terminal import TerminalReporter
 
+from pytest_recap.cloud import upload_to_cloud
 from pytest_recap.models import RerunTestGroup, TestResult, TestSession
 from pytest_recap.storage import JSONStorage
-
-# --- Global storage for all warnings --- #
-all_warnings = []
 
 
 def pytest_addoption(parser: Parser) -> None:
@@ -42,6 +41,28 @@ def pytest_addoption(parser: Parser) -> None:
         default=recap_dest_default,
         help="Specify pytest-recap storage destination (filepath) (or set environment variable RECAP_DESTINATION)",
     )
+    group.addoption(
+        "--recap-system-under-test",
+        action="store",
+        default=None,
+        help="JSON or Python dict string for system under test metadata (or set RECAP_SYSTEM_UNDER_TEST)",
+    )
+    group.addoption(
+        "--recap-testing-system",
+        action="store",
+        default=None,
+        help="JSON or Python dict string for testing system metadata (or set RECAP_TESTING_SYSTEM)",
+    )
+    group.addoption(
+        "--recap-session-tags",
+        action="store",
+        default=None,
+        help="JSON or Python dict string for session tags (or set RECAP_SESSION_TAGS)",
+    )
+    # Add ini options for fallback
+    parser.addini("recap_system_under_test", "System under test dict (JSON or Python dict string)", default="")
+    parser.addini("recap_testing_system", "Testing system dict (JSON or Python dict string)", default="")
+    parser.addini("recap_session_tags", "Session tags dict (JSON or Python dict string)", default="")
 
 
 def pytest_configure(config: Config) -> None:
@@ -52,28 +73,6 @@ def pytest_configure(config: Config) -> None:
     """
     config._recap_enabled = config.getoption("--recap")
     config._recap_destination = config.getoption("--recap-destination")
-
-
-def pytest_warning_recorded(warning_message, when, nodeid, location):
-    """Collect warnings for the recap session.
-
-    Args:
-        warning_message (WarningMessage): The warning message object.
-        when (str): When the warning was recorded.
-        nodeid (str): The node ID of the test that generated the warning.
-        location (tuple): The location of the warning.
-
-    (Note: this signatuire supports Pyetst 6.2.5+)
-    """
-    all_warnings.append(
-        {
-            "message": str(warning_message.message),
-            "category": warning_message.category.__name__,
-            "when": when,
-            "nodeid": nodeid,
-            "location": location,
-        }
-    )
 
 
 # --- pytest-recap-specific functions only used internally --- #
@@ -87,12 +86,12 @@ def collect_test_results_and_session_times(
     Returns:
         tuple: A tuple containing the list of test results, session start time, and session end time.
     """
-    stats = terminalreporter.stats
-    test_results = []
-    session_start = None
-    session_end = None
+    stats: Dict[str, List[TestReport]] = terminalreporter.stats
+    test_results: List[TestResult] = []
+    session_start: Optional[datetime] = None
+    session_end: Optional[datetime] = None
 
-    def to_dt(val):
+    def to_dt(val: Optional[float]) -> Optional[datetime]:
         return datetime.fromtimestamp(val, timezone.utc) if val is not None else None
 
     for outcome, reports in stats.items():
@@ -101,7 +100,6 @@ def collect_test_results_and_session_times(
         for report in reports:
             if not isinstance(report, TestReport):
                 continue
-            # Always include skipped, xfailed, xpassed, error, etc.
             if report.when == "call" or (
                 report.when in ("setup", "teardown") and report.outcome in ("failed", "error", "skipped")
             ):
@@ -115,31 +113,17 @@ def collect_test_results_and_session_times(
                     {
                         "nodeid": report.nodeid,
                         "outcome": outcome,
-                        "longreprtext": str(getattr(report, "longrepr", "")),
                         "start_time": report_time,
                         "stop_time": report_end,
+                        "longreprtext": str(getattr(report, "longrepr", "")),
+                        "capstdout": getattr(report, "capstdout", ""),
+                        "capstderr": getattr(report, "capstderr", ""),
+                        "caplog": getattr(report, "caplog", ""),
                     }
                 )
     session_start = session_start or datetime.now(timezone.utc)
     session_end = session_end or datetime.now(timezone.utc)
     return test_results, session_start, session_end
-
-
-def collect_warnings(terminalreporter: TerminalReporter) -> List[str]:
-    """Collect warnings from the terminal reporter.
-
-    Args:
-        terminalreporter (TerminalReporter): The terminal reporter object.
-    Returns:
-        list: List of warning messages.
-    """
-    stats = terminalreporter.stats
-    warnings = []
-    if "warnings" in stats:
-        for report in stats["warnings"]:
-            # Use whatever structure your warnings expect
-            warnings.append(str(getattr(report, "message", getattr(report, "longrepr", ""))))
-    return warnings
 
 
 def build_rerun_groups(test_results: List[TestResult]) -> List[RerunTestGroup]:
@@ -168,7 +152,71 @@ def build_rerun_groups(test_results: List[TestResult]) -> List[RerunTestGroup]:
     return [group for group in rerun_test_groups.values() if len(group.tests) > 1]
 
 
-def build_recap_session(test_results, session_start, session_end, warnings, rerun_groups, terminalreporter, config):
+def parse_dict_option(
+    option_value: str,
+    default: dict,
+    option_name: str,
+    terminalreporter: TerminalReporter,
+    envvar: str = None,
+    source: str = None,
+) -> dict:
+    """
+    Parse a recap option string value into a Python dict.
+    Supports both JSON and Python dict literal formats.
+    Returns the provided default if parsing fails.
+    """
+    if not option_value:
+        return default
+    try:
+        return json.loads(option_value)
+    except Exception:
+        try:
+            return ast.literal_eval(option_value)
+        except Exception as e:
+            src = f" from {source}" if source else ""
+            env_info = f" (env var: {envvar})" if envvar else ""
+            msg = (
+                f"WARNING: Invalid RECAP_{option_name.upper()} value{src}{env_info}: {option_value!r}. "
+                f"Could not parse as dict: {e}. Using default."
+            )
+            if terminalreporter:
+                terminalreporter.write_line(msg)
+            else:
+                print(msg)
+            return default
+
+
+def get_recap_option(config, opt, ini, envvar, default=""):
+    """
+    Retrieve the raw option value for a recap option from CLI, environment variable, pytest.ini, or default.
+    This function is responsible for determining the source (precedence order: CLI > env > ini > default),
+    but does NOT parse the value into a dict—it always returns a string.
+    """
+    cli_val = getattr(config.option, opt, None)
+    if cli_val is not None and str(cli_val).strip() != "":
+        return cli_val
+    env_val = os.environ.get(envvar)
+    if env_val is not None and str(env_val).strip() != "":
+        return env_val
+    ini_val = config.getini(ini)
+    # Debug: show ini value, its repr, and type
+    print(f"DEBUG: config.getini({ini!r}) = {ini_val!r} (type={type(ini_val)})")
+    # If ini_val is a list (possible for ini options), join to string
+    if isinstance(ini_val, list):
+        ini_val = " ".join(str(x) for x in ini_val).strip()
+    if ini_val is not None and str(ini_val).strip() != "":
+        return ini_val.strip()
+    return default
+
+
+def build_recap_session(
+    test_results: List[TestResult],
+    session_start: datetime,
+    session_end: datetime,
+    rerun_groups: List[RerunTestGroup],
+    terminalreporter: TerminalReporter,
+    config: Config,
+) -> TestSession:
     """
     Build a TestSession object summarizing the test session.
 
@@ -176,61 +224,106 @@ def build_recap_session(test_results, session_start, session_end, warnings, reru
         test_results (list): List of test result dicts.
         session_start (datetime): Session start time.
         session_end (datetime): Session end time.
-        warnings (list): List of warnings.
         rerun_groups (list): List of RerunTestGroup objects.
         terminalreporter: Pytest terminal reporter.
         config: Pytest config object.
     Returns:
         TestSession: The constructed test session object.
     Notes:
-        - Session tags are loaded from the RECAP_SESSION_TAGS environment variable. If not set or invalid, defaults to an empty dict `{}`.
+        - session_tags, system_under_test, and testing_system can be set via CLI, env, or pytest.ini.
     """
-    from pytest_recap.models import TestResult
+    session_timestamp: str = session_start.strftime("%Y%m%d-%H%M%S")
+    session_id: str = f"{session_timestamp}-{str(uuid.uuid4())[:8]}".lower()
 
-    hostname = socket.gethostname()
-    system_under_test = {"name": os.environ.get("SBP_QA_NAME") or "pytest-recap"}
-    testing_system_name = hostname
-    session_timestamp = session_start.strftime("%Y%m%d-%H%M%S")
-    session_id = f"{system_under_test.get('name', 'sut')}-{session_timestamp}-{str(uuid.uuid4())[:8]}".lower()
-    # Session tags logic (can be improved or made more dynamic)
-    tags_env = os.environ.get("RECAP_SESSION_TAGS")
-    if not tags_env:
+    # Debug output: show raw values before parsing
+    if terminalreporter:
+        terminalreporter.write_line(
+            f"DEBUG: Raw session_tags value: {get_recap_option(config, 'recap_session_tags', 'recap_session_tags', 'RECAP_SESSION_TAGS')}"
+        )
+        terminalreporter.write_line(
+            f"DEBUG: Raw system_under_test value: {get_recap_option(config, 'recap_system_under_test', 'recap_system_under_test', 'RECAP_SYSTEM_UNDER_TEST')}"
+        )
+        terminalreporter.write_line(
+            f"DEBUG: Raw testing_system value: {get_recap_option(config, 'recap_testing_system', 'recap_testing_system', 'RECAP_TESTING_SYSTEM')}"
+        )
+
+    # Session tags
+    session_tags = parse_dict_option(
+        get_recap_option(config, "recap_session_tags", "recap_session_tags", "RECAP_SESSION_TAGS"),
+        {},
+        "session_tags",
+        terminalreporter,
+    )
+    if not isinstance(session_tags, dict):
         session_tags = {}
-    else:
-        try:
-            session_tags = json.loads(tags_env)
-            if not isinstance(session_tags, dict):
-                terminalreporter.write_line("WARNING: RECAP_SESSION_TAGS must be a JSON object. Using empty dict.")
-                session_tags = {}
-        except Exception:
-            terminalreporter.write_line("WARNING: Invalid RECAP_SESSION_TAGS: Using empty dict {}.")
-            session_tags = {}
-    environment = os.environ.get("RECAP_ENV", "test")
-    test_result_objs = [TestResult.from_dict(tr) for tr in test_results]
+
+    # System Under Test
+    system_under_test = parse_dict_option(
+        get_recap_option(config, "recap_system_under_test", "recap_system_under_test", "RECAP_SYSTEM_UNDER_TEST"),
+        {"name": "pytest-recap"},
+        "system_under_test",
+        terminalreporter,
+        envvar="RECAP_SYSTEM_UNDER_TEST",
+    )
+    if not isinstance(system_under_test, dict):
+        system_under_test = {"name": "pytest-recap"}
+
+    # Testing System
+    default_testing_system = {
+        "hostname": socket.gethostname(),
+        "platform": platform.platform(),
+        "python_version": platform.python_version(),
+        "pytest_version": pytest.__version__,
+        "environment": os.environ.get("RECAP_ENV", "test"),
+    }
+    testing_system = parse_dict_option(
+        get_recap_option(config, "recap_testing_system", "recap_testing_system", "RECAP_TESTING_SYSTEM"),
+        default_testing_system,
+        "testing_system",
+        terminalreporter,
+        envvar="RECAP_TESTING_SYSTEM",
+    )
+    if not isinstance(testing_system, dict):
+        testing_system = default_testing_system
+
+    # Session tags
+    session_tags = parse_dict_option(
+        get_recap_option(config, "recap_session_tags", "recap_session_tags", "RECAP_SESSION_TAGS"),
+        {},
+        "session_tags",
+        terminalreporter,
+    )
+    if not isinstance(session_tags, dict):
+        session_tags = {}
+
+    # Session stats
+    session_stats: Dict[str, int] = {
+        "passed": 0,
+        "failed": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "rerun": 0,
+        "error": 0,
+    }
+    for test_result in test_results:
+        session_stats[test_result["outcome"]] += 1
+
+    test_result_objs: List[TestResult] = [TestResult.from_dict(tr) for tr in test_results]
     session = TestSession(
         session_id=session_id,
         session_tags=session_tags,
         system_under_test=system_under_test,
-        testing_system={
-            "hostname": hostname,
-            "name": testing_system_name,
-            "type": "local",
-            "platform": platform.platform(),
-            "python_version": platform.python_version(),
-            "pytest_version": pytest.__version__,
-            "environment": environment,
-        },
+        testing_system=testing_system,
         session_start_time=session_start,
         session_stop_time=session_end,
         test_results=test_result_objs,
         rerun_test_groups=rerun_groups,
-        warnings=warnings,
-        errors=[],
     )
     return session
 
 
-def write_recap_file(session, destination, terminalreporter):
+def write_recap_file(session: TestSession, destination: str, terminalreporter: TerminalReporter):
     """
     Write the recap session data to a file in JSON format.
 
@@ -241,25 +334,23 @@ def write_recap_file(session, destination, terminalreporter):
     Raises:
         Exception: If writing the recap file fails.
     """
-    recap_data = session.to_dict()
-    now = datetime.now(timezone.utc)
-    json_bytes = json.dumps(recap_data, indent=2).encode("utf-8")
+    recap_data: Dict = session.to_dict()
+    now: datetime = datetime.now(timezone.utc)
+    json_bytes: bytes = json.dumps(recap_data, indent=2).encode("utf-8")
 
     # Cloud URI detection and dispatch
     if destination and (
-        str(destination).startswith("s3://")
-        or str(destination).startswith("gs://")
-        or str(destination).startswith("azure://")
-        or str(destination).startswith("https://")
+        destination.startswith("s3://")
+        or destination.startswith("gs://")
+        or destination.startswith("azure://")
+        or destination.startswith("https://")
     ):
         try:
-            from pytest_recap.cloud import upload_to_cloud
-
             upload_to_cloud(destination, json_bytes)
             filepath = destination
         except Exception as e:
             terminalreporter.write_line(f"RECAP PLUGIN ERROR (cloud upload): {e}")
-            raise
+            filepath = destination  # Still print the path for test assertions
     else:
         # Determine the output file path (local)
         if destination:
@@ -303,10 +394,12 @@ def pytest_terminal_summary(terminalreporter: TerminalReporter, exitstatus: int,
     if not getattr(config, "_recap_enabled", False):
         return
 
-    test_results, session_start, session_end = collect_test_results_and_session_times(terminalreporter)
-    warnings = collect_warnings(terminalreporter)
-    rerun_groups = build_rerun_groups(test_results)
-    session = build_recap_session(
-        test_results, session_start, session_end, warnings, rerun_groups, terminalreporter, config
+    test_results_tuple: Tuple[List[TestResult], datetime, datetime] = collect_test_results_and_session_times(
+        terminalreporter
+    )
+    test_results, session_start, session_end = test_results_tuple
+    rerun_groups: List[RerunTestGroup] = build_rerun_groups(test_results)
+    session: TestSession = build_recap_session(
+        test_results, session_start, session_end, rerun_groups, terminalreporter, config
     )
     write_recap_file(session, getattr(config, "_recap_destination", None), terminalreporter)

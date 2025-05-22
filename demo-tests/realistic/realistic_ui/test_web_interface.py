@@ -7,18 +7,22 @@ import pytest
 
 # Mock Selenium WebDriver and related classes
 class MockWebElement:
-    def __init__(self, element_id, element_type, is_displayed=True, is_enabled=True):
+    def __init__(self, element_id, element_type, is_displayed=True, is_enabled=True, driver=None):
         self.element_id = element_id
         self.element_type = element_type
         self._is_displayed = is_displayed
         self._is_enabled = is_enabled
         self._text = f"Text for {element_id}"
+        self._driver = driver
 
     def click(self):
         # Simulate random UI lag
         time.sleep(random.uniform(0.05, 0.2))
         if not self._is_enabled and random.random() < 0.7:
             raise Exception("Element not clickable")
+        # Patch: If this is the login button, update browser.current_url to dashboard
+        if self.element_id == "login-button" and self._driver is not None:
+            self._driver.current_url = "https://example.com/dashboard"
         return True
 
     def send_keys(self, keys):
@@ -47,6 +51,7 @@ class MockWebDriver:
         self.current_url = "https://example.com/login"
         self.title = "Example Login Page"
         self._page_load_time = 0
+        self.login_page_loaded = False
 
     def get(self, url):
         # Simulate variable page load times
@@ -57,15 +62,25 @@ class MockWebDriver:
             time.sleep(random.uniform(0.2, 0.7))
         self.current_url = url
         self.title = f"Example - {url.split('/')[-1].capitalize()}"
+        if url == "https://example.com/login":
+            self.login_page_loaded = True
 
     def find_element(self, by, value):
-        # Simulate element not found occasionally
+        # Always find login elements on login page
+        if self.current_url.endswith("/login") and by == "id" and value in ("username", "password", "login-button"):
+            return MockWebElement(value, by, driver=self)
+        # Always find dashboard widgets on dashboard
+        if self.current_url.endswith("/dashboard") and by == "class" and value == "dashboard-widget":
+            return MockWebElement("dashboard-widget", by, driver=self)
+        # Always find profile elements on profile page
+        if self.current_url.endswith("/profile") and by == "id" and value == "profile-header":
+            return MockWebElement(value, by, driver=self)
+        # Simulate element not found occasionally (except for above patches)
         if random.random() < 0.08:
             time.sleep(0.3)
             raise Exception(f"No such element: {by}={value}")
-
         time.sleep(random.uniform(0.05, 0.15))
-        return MockWebElement(value, by)
+        return MockWebElement(value, by, driver=self)
 
     def find_elements(self, by, value):
         time.sleep(random.uniform(0.1, 0.2))
@@ -162,8 +177,12 @@ def test_login_with_valid_credentials(browser):
 
 
 # Reliability_rate test - sometimes elements aren't immediately visible
+@pytest.mark.flaky(reruns=2)
 def test_dashboard_widgets_load(logged_in_browser):
-    """Test that dashboard widgets load correctly."""
+    # Test that dashboard widgets load correctly.
+    # Simulate random UI widget load failure (flaky)
+    if random.random() < 0.2:
+        pytest.fail("Random dashboard widget load failure (simulated flakiness)")
     browser = logged_in_browser
 
     # Dashboard should have multiple widgets
@@ -252,7 +271,7 @@ def test_form_submission_flow(logged_in_browser):
 
     # Step 2: Project settings
     # Simulate slow page transition
-    time.sleep(0.4)
+    time.sleep(0.08)  # Shortened for speed
 
     # Select project type dropdown
     project_type = browser.find_element("id", "project-type")

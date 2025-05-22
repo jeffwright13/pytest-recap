@@ -181,6 +181,7 @@ def test_api_batch_operations(api_client):
 
 
 # Test that occasionally fails due to server errors
+@pytest.mark.flaky(reruns=2)
 def test_api_update_user(api_client, mock_user_data):
     """Test updating user information."""
     # Simulate random server errors (about 8% of the time)
@@ -246,15 +247,14 @@ def test_api_delete_user(api_client, mock_user_data):
 
 
 # Dependent tests to show correlation
+@pytest.mark.flaky(reruns=2)
 @pytest.mark.dependency()
 def test_api_user_login():
     """Test user login endpoint."""
-    # This test will pass 90% of the time
-    if random.random() < 0.1:
-        time.sleep(0.1)
-        pytest.fail("Login service unavailable")
-
-    time.sleep(0.08)
+    # This test will pass 70% of the time (flaky)
+    if random.random() < 0.3:
+        pytest.fail("Random login failure (simulated flakiness)")
+    time.sleep(0.05)
     assert True
 
 

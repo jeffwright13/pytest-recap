@@ -76,11 +76,7 @@ class MockInventoryService:
     def get_product(self, product_id):
         # Simulate network latency
         time.sleep(random.uniform(0.08, 0.2))
-
-        # Simulate service failures
-        if random.random() < self.failure_rate:
-            return {"success": False, "error": "Inventory service unavailable"}
-
+        # Remove random service failures for deterministic behavior
         if product_id in self.inventory:
             return {"success": True, "product": self.inventory[product_id]}
         else:
@@ -106,18 +102,12 @@ class MockInventoryService:
     def update_stock(self, product_id, quantity_change):
         # Simulate network latency
         time.sleep(random.uniform(0.1, 0.25))
-
-        # Simulate service failures
-        if random.random() < self.failure_rate:
-            return {"success": False, "error": "Inventory service unavailable"}
-
+        # Remove random service failures for deterministic behavior
         if product_id in self.inventory:
             product = self.inventory[product_id]
             new_stock = product["stock"] + quantity_change
-
             if new_stock < 0:
                 return {"success": False, "error": "Insufficient stock"}
-
             product["stock"] = new_stock
             return {"success": True, "new_stock": new_stock}
         else:
@@ -133,61 +123,38 @@ class MockOrderService:
     def create_order(self, user_id, items):
         # Simulate network latency
         time.sleep(random.uniform(0.2, 0.4))
-
-        # Simulate service failures
-        if random.random() < self.failure_rate:
-            return {"success": False, "error": "Order service unavailable"}
-
+        # Remove random service failures for deterministic behavior
         # Check stock for all items
         unavailable_items = []
         for item in items:
             product_id = item["product_id"]
             quantity = item["quantity"]
-
             stock_check = self.inventory_service.check_stock(product_id, quantity)
             if not stock_check["success"] or not stock_check["available"]:
                 unavailable_items.append(product_id)
-
         if unavailable_items:
-            return {
-                "success": False,
-                "error": "Some items are unavailable",
-                "unavailable_items": unavailable_items,
-            }
-
-        # Create order
-        order_id = f"order-{int(time.time())}-{random.randint(1000, 9999)}"
-        order_total = 0
-
-        order_items = []
+            return {"success": False, "error": f"Unavailable items: {unavailable_items}"}
+        # Deduct stock for all items
         for item in items:
             product_id = item["product_id"]
             quantity = item["quantity"]
-
-            # Get product details
-            product_info = self.inventory_service.get_product(product_id)
-            if not product_info["success"]:
-                continue
-
-            product = product_info["product"]
-            item_total = product["price"] * quantity
-
-            # Update inventory
             self.inventory_service.update_stock(product_id, -quantity)
-
+        # Create and save order
+        order_id = f"order-{int(time.time())}-{random.randint(1000, 9999)}"
+        order_items = []
+        order_total = 0.0
+        for item in items:
+            product = self.inventory_service.inventory[item["product_id"]]
             order_items.append(
                 {
-                    "product_id": product_id,
+                    "product_id": product["id"],
                     "name": product["name"],
                     "price": product["price"],
-                    "quantity": quantity,
-                    "total": item_total,
+                    "quantity": item["quantity"],
+                    "total": product["price"] * item["quantity"],
                 }
             )
-
-            order_total += item_total
-
-        # Save order
+            order_total += product["price"] * item["quantity"]
         self.orders[order_id] = {
             "id": order_id,
             "user_id": user_id,
@@ -196,7 +163,6 @@ class MockOrderService:
             "status": "created",
             "created": datetime.now().isoformat(),
         }
-
         return {"success": True, "order_id": order_id, "total": order_total}
 
     def get_order(self, order_id):
@@ -333,6 +299,7 @@ def test_authentication_flow(auth_service):
 
 
 # End-to-end order workflow test
+@pytest.mark.flaky(reruns=2)
 def test_complete_order_workflow(authenticated_user, inventory_service, order_service, payment_service):
     """Test the complete order workflow from product selection to payment."""
     # Step 1: Get user token from authentication
@@ -345,6 +312,9 @@ def test_complete_order_workflow(authenticated_user, inventory_service, order_se
 
     if not product_result["success"]:
         pytest.skip("Product lookup failed")
+    # Simulate random integration failure (flaky)
+    if random.random() < 0.15:
+        pytest.fail("Random workflow failure (simulated flakiness)")
 
     product = product_result["product"]
     initial_stock = product["stock"]

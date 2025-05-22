@@ -1,6 +1,35 @@
 # CHANGELOG
 
-## [Unreleased / 0.7.0] - 2025-05-06
+## [Unreleased]
+
+### Fixed
+- Robust handling of ini values for session metadata (now always parsed as string, even if provided as a list by pytest).
+- Warning messages for invalid session metadata now always reference the correct environment variable or CLI option, improving clarity and testability.
+- Improved debug output for session metadata resolution and parsing.
+
+## [0.8.0] - 2025-05-21
+
+### Added
+- Refactored session schema: replaced `sut_name` with `system_under_test` (now a dict), and updated all code/tests accordingly.
+- Enhanced both `system_under_test` and `testing_system` fields for user-extensible metadata.
+- Improved JSON schema: added recommended keys, allowed custom properties, and linked schema in README.
+- Expanded and clarified README: added schema section, extensibility guidance, example output, and a neutral comparison with JUnit-XML and pytest-json-report.
+- Added `demo-tests/README.md` to clarify demo structure and subfolder purposes.
+
+### Changed
+- Updated plugin logic and file naming to use new extensible fields.
+- Improved concurrency: added thread/process safety to JSONStorage using threading.RLock and FileLock.
+- Made session loader stricter: only accepts lists or dicts with 'sessions' key as valid session lists.
+- Improved test coverage and reliability, including edge cases and permission scenarios.
+- Updated pre-commit config to match pytest's standard test file naming convention (`test_*.py`).
+
+### Fixed
+- Fixed and clarified permission error handling and related tests for robust cross-platform behavior.
+- Addressed linter feedback and pre-commit hook config issues.
+
+---
+
+## [0.7.0] - 2025-05-06
 
 ### Added
 - Initial implementation of core recap models and storage logic.

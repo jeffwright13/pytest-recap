@@ -245,9 +245,3 @@ def test_e2e_outcome_accounting(pytester, tmp_path):
         if pytest_count != recap_count:
             mismatches.append((stat_key, pytest_count, recap_key, recap_count))
     assert not mismatches, f"Outcome mismatch: {mismatches}\nPytest stats: {stats}\nRecap: {recap_counts}"
-    # Check warnings separately in the recap file
-    recap_warning_count = len(data.get("warnings", []))
-    pytest_warning_count = stats.get("warnings", 0)
-    assert (
-        recap_warning_count == pytest_warning_count
-    ), f"Warning count mismatch: recap={recap_warning_count}, pytest={pytest_warning_count}"

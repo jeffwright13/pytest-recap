@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 
@@ -224,31 +226,125 @@ def test_recap_disabled_by_default(monkeypatch, tester):
     result.assert_outcomes(passed=1)
 
 
-def test_recap_env_and_tags(monkeypatch, tester, tmp_path):
-    """Test RECAP_ENV and RECAP_SESSION_TAGS environment variables."""
+@pytest.mark.parametrize(
+    "cli,env,ini,expected",
+    [
+        # CLI wins
+        ('{"name": "cli"}', '{"name": "env"}', '{"name": "ini"}', {"name": "cli"}),
+        # Env wins over ini
+        ("", '{"name": "env"}', '{"name": "ini"}', {"name": "env"}),
+        # Ini fallback
+        ("", "", '{"name": "ini"}', {"name": "ini"}),
+        # Default fallback
+        ("", "", "", {"name": "pytest-recap"}),
+        # Python dict string
+        ("{'name': 'cli-dict'}", "", "", {"name": "cli-dict"}),
+    ],
+)
+def test_system_under_test_precedence(monkeypatch, tester, tmp_path, cli, env, ini, expected):
     monkeypatch.setenv("RECAP_ENABLE", "1")
-    monkeypatch.setenv("RECAP_ENV", "staging")
-    tags = {"ci": "github", "branch": "main", "build": "123"}
-    import json
-
-    dest_file = tmp_path / "session-env-tags.json"
-    monkeypatch.setenv("RECAP_SESSION_TAGS", json.dumps(tags))
-    tester.makepyfile(
-        """
-        def test_dummy():
-            assert True
-    """
-    )
-    result = tester.runpytest(f"--recap-destination={dest_file}")
+    dest_file = tmp_path / "recap-sut.json"
+    if env:
+        monkeypatch.setenv("RECAP_SYSTEM_UNDER_TEST", env)
+    if ini:
+        tester.makeini(f"[pytest]\nrecap_system_under_test = {ini}\n")
+    tester.makepyfile("def test_dummy(): assert True\n")
+    args = [f"--recap-destination={dest_file}"]
+    if cli:
+        args += ["--recap-system-under-test", cli]
+    result = tester.runpytest(*args)
     result.assert_outcomes(passed=1)
-    # Now check the file directly
-    assert dest_file.exists(), f"Recap file was not created: {dest_file}"
-    with open(dest_file) as f:
-        data = json.load(f)
-    print(f"DEBUG: Recap file content: {data}")
-    assert isinstance(data, dict), f"Expected dict, got {type(data)}: {data}"
-    assert data["testing_system"]["environment"] == "staging"
-    assert data["session_tags"] == tags
+    assert dest_file.exists()
+    data = json.loads(dest_file.read_text())
+    assert data["system_under_test"] == expected
+
+
+@pytest.mark.parametrize(
+    "cli,env,ini,expected",
+    [
+        ('{"host": "cli"}', '{"host": "env"}', '{"host": "ini"}', {"host": "cli"}),
+        ("", '{"host": "env"}', '{"host": "ini"}', {"host": "env"}),
+        ("", "", '{"host": "ini"}', {"host": "ini"}),
+        ("", "", "", None),  # Will check for default keys
+        ("{'host': 'cli-dict'}", "", "", {"host": "cli-dict"}),
+    ],
+)
+def test_testing_system_precedence(monkeypatch, tester, tmp_path, cli, env, ini, expected):
+    monkeypatch.setenv("RECAP_ENABLE", "1")
+    dest_file = tmp_path / "recap-tsys.json"
+    if env:
+        monkeypatch.setenv("RECAP_TESTING_SYSTEM", env)
+    if ini:
+        tester.makeini(f"[pytest]\nrecap_testing_system = {ini}\n")
+    tester.makepyfile("def test_dummy(): assert True\n")
+    args = [f"--recap-destination={dest_file}"]
+    if cli:
+        args += ["--recap-testing-system", cli]
+    result = tester.runpytest(*args)
+    result.assert_outcomes(passed=1)
+    assert dest_file.exists()
+    data = json.loads(dest_file.read_text())
+    if expected is not None:
+        assert all(item in data["testing_system"].items() for item in expected.items())
+    else:
+        # Should have default keys
+        for key in ["hostname", "platform", "python_version", "pytest_version", "environment"]:
+            assert key in data["testing_system"]
+
+
+@pytest.mark.parametrize(
+    "cli,env,ini,expected",
+    [
+        ('{"tag": "cli"}', '{"tag": "env"}', '{"tag": "ini"}', {"tag": "cli"}),
+        ("", '{"tag": "env"}', '{"tag": "ini"}', {"tag": "env"}),
+        ("", "", '{"tag": "ini"}', {"tag": "ini"}),
+        ("", "", "", {}),
+        ("{'tag': 'cli-dict'}", "", "", {"tag": "cli-dict"}),
+    ],
+)
+def test_session_tags_precedence(monkeypatch, tester, tmp_path, cli, env, ini, expected):
+    monkeypatch.setenv("RECAP_ENABLE", "1")
+    dest_file = tmp_path / "recap-tags.json"
+    if env:
+        monkeypatch.setenv("RECAP_SESSION_TAGS", env)
+    if ini:
+        tester.makeini(f"[pytest]\nrecap_session_tags = {ini}\n")
+    tester.makepyfile("def test_dummy(): assert True\n")
+    args = [f"--recap-destination={dest_file}"]
+    if cli:
+        args += ["--recap-session-tags", cli]
+    result = tester.runpytest(*args)
+    result.assert_outcomes(passed=1)
+    assert dest_file.exists()
+    data = json.loads(dest_file.read_text())
+    assert data["session_tags"] == expected
+
+
+@pytest.mark.parametrize(
+    "opt,envvar,expected_key",
+    [
+        ("--recap-system-under-test", "RECAP_SYSTEM_UNDER_TEST", "system_under_test"),
+        ("--recap-testing-system", "RECAP_TESTING_SYSTEM", "testing_system"),
+        ("--recap-session-tags", "RECAP_SESSION_TAGS", "session_tags"),
+    ],
+)
+def test_invalid_json(monkeypatch, tester, tmp_path, opt, envvar, expected_key):
+    monkeypatch.setenv("RECAP_ENABLE", "1")
+    dest_file = tmp_path / "recap-invalid.json"
+    monkeypatch.setenv(envvar, "not a dict")
+    tester.makepyfile("def test_dummy(): assert True\n")
+    args = [f"--recap-destination={dest_file}"]
+    result = tester.runpytest(*args)
+    result.assert_outcomes(passed=1)
+    data = json.loads(dest_file.read_text())
+    # Should fallback to default
+    if expected_key == "system_under_test":
+        assert data[expected_key]["name"] == "pytest-recap"
+    elif expected_key == "testing_system":
+        for key in ["hostname", "platform", "python_version", "pytest_version", "environment"]:
+            assert key in data[expected_key]
+    else:
+        assert data[expected_key] == {}
 
 
 def test_recap_session_tags_invalid(monkeypatch, tester, tmp_path):
@@ -286,7 +382,7 @@ def test_recap_cloud_destination(monkeypatch, tester, mocker, cloud_uri):
     Test that specifying a cloud URI as recap destination triggers cloud upload
     and prints the URI in the terminal output.
     """
-    mock_upload = mocker.patch("pytest_recap.cloud.upload_to_cloud")
+    mock_upload = mocker.patch("pytest_recap.plugin.upload_to_cloud")
     monkeypatch.setenv("RECAP_ENABLE", "1")
     monkeypatch.setenv("RECAP_DESTINATION", cloud_uri)
     tester.makepyfile(

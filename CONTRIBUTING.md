@@ -12,7 +12,12 @@ Thank you for your interest in contributing to **pytest-recap**!
 
 ```bash
 uv pip install -e .
-uv pip install -r requirements-dev.txt  # or use `uv add --dev ...` as needed
+```
+
+To install all dependencies (core + dev, including cloud and test tools) using uv's dependency groups:
+
+```bash
+uv pip install --group all
 ```
 
 ### Running Tests

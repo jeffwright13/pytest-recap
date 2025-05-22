@@ -10,10 +10,9 @@ Capture your test sessions. Recap the results.
 
 - **Comprehensive session recap**: Records all test outcomes, timings, logs, and more.
 - **Cloud storage support**: Write recaps directly to AWS S3 (`s3://`), Google Cloud Storage (`gs://`), or Azure Blob Storage (`azure://`).
-- **Flexible output**: Supports local file, directory, or cloud URI destinations.
+- **User-definable metadata**: Configure system under test, testing system, and session tags.
 - **Rerun group tracking**: Handles flaky/rerun tests with group summaries.
 - **Color-highlighted output**: Recap file path/URI is colorized in the terminal.
-- **Tested with pytest-mock and moto**: Full test suite with cloud mocks and coverage.
 
 ---
 
@@ -21,6 +20,12 @@ Capture your test sessions. Recap the results.
 
 ```bash
 uv pip install pytest-recap
+```
+
+To install all dependencies (core + dev, including cloud and test tools) using uv's dependency groups:
+
+```bash
+uv pip install --group all
 ```
 
 For cloud storage support in tests:
@@ -32,6 +37,8 @@ For cloud storage support in tests:
 
 ## Usage
 
+**Troubleshooting tip:** If you encounter issues with session metadata not being picked up, run pytest with `-s` to see debug output for ini/env/CLI value resolution.
+
 Run pytest as usual. Recap output is written to `recap-session.json` by default, or to a custom file/directory/cloud URI using the `--recap-destination` option.
 
 ```bash
@@ -40,14 +47,6 @@ pytest --recap-destination=azure://mycontainer/recap-session.json
 pytest --recap-destination=./output_dir/
 ```
 
-### Recap Session Schema
-
-The structure of the recap JSON is governed by a [JSON Schema](schema/pytest-recap-session.schema.json) ([view raw](./schema/pytest-recap-session.schema.json)).
-
-- **`system_under_test`** and **`testing_system`** are extensible objects. You can add any custom keys relevant to your context (e.g., version, type, description).
-- Recommended keys for `system_under_test` include: `name`, `version`, `type`, `description`.
-- See the [schema file](schema/pytest-recap-session.schema.json) for details and validation rules.
-
 ### Example Recap JSON
 
 <details>
@@ -55,15 +54,124 @@ The structure of the recap JSON is governed by a [JSON Schema](schema/pytest-rec
 
   ```json
   {
-    "session_id": "20250503-074257_pytest-recap",
-    ...
-    "system_under_test": { "name": "pytest-recap", "version": "0.7.0", "type": "pytest-plugin" },
-    "testing_system": { "hostname": "devbox", "python_version": "3.9.16" },
-    "test_results": [ ... ],
-    "rerun_test_groups": [ ... ]
+    "session_id": "20250522-064200_pytest-recap",
+    "session_tags": { "run_type": "smoke", "branch": "main" },
+    "session_start_time": "2025-05-22T06:42:00Z",
+    "session_stop_time": "2025-05-22T06:45:12Z",
+    "system_under_test": {
+      "name": "pytest-recap",
+      "version": "0.8.0",
+      "type": "pytest-plugin",
+      "description": "Pytest plugin for session recaps"
+    },
+    "testing_system": {
+      "hostname": "ci-runner-01",
+      "platform": "Linux",
+      "python_version": "3.11.2",
+      "pytest_version": "8.3.5"
+    },
+    "test_results": [
+      {
+        "nodeid": "tests/test_example.py::test_foo",
+        "outcome": "passed",
+        "start_time": "2025-05-22T06:42:01Z",
+        "stop_time": "2025-05-22T06:42:01Z",
+        "caplog": "INFO: test log message",
+        "capstderr": "",
+        "capstdout": "stdout output here\n",
+        "longreprtext": ""
+      },
+      {
+        "nodeid": "tests/test_example.py::test_bar",
+        "outcome": "failed",
+        "start_time": "2025-05-22T06:42:02Z",
+        "stop_time": "2025-05-22T06:42:02Z",
+        "caplog": "ERROR: test failure log",
+        "capstderr": "error output\n",
+        "capstdout": "",
+        "longreprtext": "AssertionError: expected 1, got 0"
+      }
+    ],
+    "rerun_test_groups": [
+      {
+        "nodeid": "tests/test_example.py::test_flaky",
+        "tests": [
+          {
+            "nodeid": "tests/test_example.py::test_flaky",
+            "outcome": "failed",
+            "start_time": "2025-05-22T06:42:03Z",
+            "stop_time": "2025-05-22T06:42:03Z",
+            "caplog": "ERROR: intermittent failure",
+            "capstderr": "",
+            "capstdout": "",
+            "longreprtext": "AssertionError: flaky failure"
+          },
+          {
+            "nodeid": "tests/test_example.py::test_flaky",
+            "outcome": "passed",
+            "start_time": "2025-05-22T06:42:04Z",
+            "stop_time": "2025-05-22T06:42:04Z",
+            "caplog": "",
+            "capstderr": "",
+            "capstdout": "",
+            "longreprtext": ""
+          }
+        ]
+      }
+    ],
+    "session_stats": {
+      "passed": 2,
+      "failed": 1
+    }
   }
   ```
 </details>
+
+### Recap Session Schema
+
+The structure of the recap JSON is governed by a [JSON Schema](schema/pytest-recap-session.schema.json) ([view raw](./schema/pytest-recap-session.schema.json)).
+
+- **`system_under_test`**, **`testing_system`**, and **`session_tags`** can be customized for each run.
+- You can set these via:
+  - **CLI options:**
+    ```bash
+    pytest --recap-system-under-test='{"name": "myapp"}' \
+           --recap-testing-system='{"hostname": "ci"}' \
+           --recap-session-tags='{"run_type": "smoke"}'
+    ```
+  - **Environment variables:**
+    ```bash
+    export RECAP_SYSTEM_UNDER_TEST='{"name": "myapp"}'
+    export RECAP_TESTING_SYSTEM='{"hostname": "ci"}'
+    export RECAP_SESSION_TAGS='{"run_type": "smoke"}'
+    ```
+  - **pytest.ini:**
+    ```ini
+    [pytest]
+    recap_system_under_test = {"name": "myapp"}
+    recap_testing_system = {"hostname": "ci"}
+    recap_session_tags = {"run_type": "smoke"}
+    ```
+- Accepted formats: JSON or Python dict string.
+- Precedence: CLI > Environment variable > pytest.ini > default. This precedence is strictly enforced, with robust handling of whitespace and ini list/string edge cases.
+- If invalid input is provided, a warning is printed referencing the relevant CLI option or environment variable, and a default is used.
+- Warnings for invalid session metadata (e.g., `RECAP_SESSION_TAGS`) will always mention the relevant environment variable or option name for clarity.
+- **`system_under_test`** and **`testing_system`** are extensible objects. You can add any custom keys relevant to your context (e.g., version, type, description).
+- Recommended keys for `system_under_test` include: `name`, `version`, `type`, `description`.
+- See the [schema file](schema/pytest-recap-session.schema.json) for details and validation rules.
+
+### Test Result Fields
+
+| Field Name | Description |
+| --- | --- |
+| `nodeid` | Unique identifier for the test (e.g., `tests/test_example.py::test_foo`) |
+| `outcome` | Test outcome (e.g., `passed`, `failed`, `skipped`) |
+| `start_time` | Timestamp when the test started |
+| `stop_time` | Timestamp when the test finished |
+| `longreprtext` | Detailed error message (if applicable) |
+| `capstdout` | Captured standard output |
+| `capstderr` | Captured standard error |
+| `caplog` | Captured log messages |
 
 ---
 
@@ -82,6 +190,7 @@ The structure of the recap JSON is governed by a [JSON Schema](schema/pytest-rec
 - S3 tests require `moto` and `boto3` (optional; skipped if not installed).
 - GCS/Azure tests use direct mocking for fast, dependency-light testing.
 - Pre-commit hooks: see `.pre-commit-config.yaml` for ruff, pytest-check, etc.
+- The test suite covers all precedence and fallback logic for session metadata (CLI, env, ini, default), including edge cases and warning output.
 
 ---
 

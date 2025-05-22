@@ -35,7 +35,12 @@ def test0_10_fail_capturing(capsys, fake_data, logger):
     assert False
 
 
-def test0_pass_1(logger):
+def test_with_warning(recwarn):
+    warnings.warn("something!")
+    assert any("something!" in str(w.message) for w in recwarn)
+
+
+def test0_pass_1(logger, capstdout):
     print("Test Pass 1!")
     logger.info(ZWS_X3)
     logger.critical("CRITICAL")
@@ -44,10 +49,13 @@ def test0_pass_1(logger):
     logger.info("INFO")
     logger.debug("DEBUG")
     logger.info(ZWJ_X3)
+    warnings.warn("This is a test warning from test0_pass_1!")
+    out = capstdout.readouterr().out
+    assert "Test Pass 1!" in out
     assert True
 
 
-def test0_pass_2_logs(logger):
+def test0_pass_2_logs(logger, capstdlog):
     print("Test Pass 2!")
     logger.info(ZWS_X3)
     logger.critical("CRITICAL")
@@ -56,6 +64,8 @@ def test0_pass_2_logs(logger):
     logger.info("INFO")
     logger.debug("DEBUG")
     logger.info(ZWJ_X3)
+    logs = capstdlog.text
+    assert "CRITICAL" in logs or "INFO" in logs
     assert True
 
 
@@ -64,24 +74,35 @@ def error_fixture(logger):
     raise Exception("Error in fixture")
 
 
-def test0_pass_3_error_in_fixture(error_fixture):
+def test0_pass_3_error_in_fixture(error_fixture, capstdout):
     print("Test Pass 3!")
+    out = capstdout.readouterr().out
+    assert "Test Pass 3!" in out
     assert True
 
 
-def test0_fail_1(logger):
+def test0_fail_1(logger, capstderr):
     print("Test Fail 1!")
+    print("Failing on stderr!", file=sys.stderr)
+    err = capstderr.readouterr().err
+    assert "Failing on stderr!" in err
     assert 1 == 2
 
 
 @pytest.mark.skip(reason="Skipping this test with decorator.")
-def test0_skip(logger):
+def test0_skip(logger, capstdlog):
+    logger.info("Skipping!")
+    logs = capstdlog.text
+    assert "Skipping!" in logs
     assert True
 
 
 @pytest.mark.xfail()
-def test0_xfail(logger):
+def test0_xfail(logger, capstderr):
     print("Test 0 XFail")
+    print("XFail to stderr!", file=sys.stderr)
+    err = capstderr.readouterr().err
+    assert "XFail to stderr!" in err
     logger.info(ZWS_X3)
     logger.critical("CRITICAL")
     logger.error("ERROR")
@@ -92,13 +113,17 @@ def test0_xfail(logger):
     assert False
 
 
+@pytest.mark.xfail(reason="Demonstrate XPASS (unexpected pass)")
+def test0_xpass_demo():
+    """This test is expected to fail, but will pass (XPASS)."""
+    assert True
+
+
 @pytest.mark.xfail()
-def test0_xpass(logger):
-    # logger.name = __name__
+def test0_xpass(logger, capstdout):
     print("Test 0 XPass")
-    # logger.info(ZWS_X3)
-    # logger.critical("CRITICAL")
-    # logger.error("ERROR")
+    out = capstdout.readouterr().out
+    assert "Test 0 XPass" in out
     logger.warning("WARNING")
     logger.info("INFO")
     logger.debug("DEBUG")
@@ -112,11 +137,28 @@ def api_v1():
     return 1
 
 
-def test0_warning():
+def test0_warning(capstdlog):
+    import warnings
+
+    warnings.warn("Test warning from test0_warning!")
+    assert True
     assert api_v1() == 1
 
 
 # Has a 1 in 32 chance of failing
 @pytest.mark.flaky(reruns=5)
-def test_flaky_3():
+def test_flaky_3(capstderr):
+    print("Flaky test running", file=sys.stderr)
+    err = capstderr.readouterr().err
+    assert "Flaky test running" in err
     assert random.choice([True, False])
+
+
+@pytest.mark.flaky(reruns=2)
+def test_always_rerun(tmp_path):
+    state_file = tmp_path / "rerun_state.txt"
+    if not state_file.exists():
+        state_file.write_text("fail")
+        assert False, "Fail first run"
+    else:
+        assert True

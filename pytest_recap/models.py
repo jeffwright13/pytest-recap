@@ -103,7 +103,6 @@ class TestResult:
         capstderr (str): Captured stderr output.
         capstdout (str): Captured stdout output.
         longreprtext (str): Long representation of failure, if any.
-        has_warning (bool): Whether the test had a warning.
     """
 
     __test__ = False  # Tell Pytest this is NOT a test class
@@ -118,6 +117,7 @@ class TestResult:
     capstdout: str = ""
     longreprtext: str = ""
     has_warning: bool = False
+    has_error: bool = False
 
     def __post_init__(self):
         """
@@ -163,7 +163,6 @@ class TestResult:
             "capstderr": self.capstderr,
             "capstdout": self.capstdout,
             "longreprtext": self.longreprtext,
-            "has_warning": self.has_warning,
         }
 
     @classmethod
@@ -187,7 +186,6 @@ class TestResult:
             capstderr=data.get("capstderr", ""),
             capstdout=data.get("capstdout", ""),
             longreprtext=data.get("longreprtext", ""),
-            has_warning=data.get("has_warning", False),
         )
 
 
@@ -298,7 +296,7 @@ class TestSessionStats:
 @dataclass
 class TestSession:
     """
-    Represents a test session recap with session-level metadata, results, warnings, and errors.
+    Represents a test session recap with session-level metadata, results.
 
     Attributes:
         session_id (str): Unique session identifier.
@@ -309,8 +307,6 @@ class TestSession:
         testing_system (Dict[str, Any]): Metadata about the testing system.
         test_results (List[TestResult]): List of test results in the session.
         rerun_test_groups (List[RerunTestGroup]): Groups of rerun tests.
-        warnings (List[Any]): List of session-level warnings.
-        errors (List[Any]): List of session-level errors.
         session_stats (TestSessionStats): Test session statistics.
     """
 
@@ -326,8 +322,6 @@ class TestSession:
         testing_system: dict = None,
         test_results: list = None,
         rerun_test_groups: list = None,
-        warnings: list = None,
-        errors: list = None,
         session_stats: TestSessionStats = None,
     ):
         self.session_id = session_id
@@ -338,8 +332,6 @@ class TestSession:
         self.testing_system = testing_system or {}
         self.test_results = test_results or []
         self.rerun_test_groups = rerun_test_groups or []
-        self.warnings = warnings or []
-        self.errors = errors or []
         self.session_stats = session_stats or TestSessionStats(self.test_results)
 
     def to_dict(self) -> Dict:
@@ -361,8 +353,6 @@ class TestSession:
                 {"nodeid": group.nodeid, "tests": [t.to_dict() for t in group.tests]}
                 for group in self.rerun_test_groups
             ],
-            "warnings": self.warnings,
-            "errors": self.errors,
             "session_stats": self.session_stats.as_dict() if self.session_stats else {},
         }
 
@@ -388,8 +378,6 @@ class TestSession:
             testing_system=d.get("testing_system", {}),
             test_results=test_results,
             rerun_test_groups=[RerunTestGroup.from_dict(g) for g in d.get("rerun_test_groups", [])],
-            warnings=d.get("warnings", []),
-            errors=d.get("errors", []),
             session_stats=session_stats,
         )
 
