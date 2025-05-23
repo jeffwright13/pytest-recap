@@ -28,8 +28,8 @@ unsafe-fixes = true
 src = ["src"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I"]
-fixable = ["E", "F", "I"]
+select = ["D", "DOC", "E", "F", "I"]
+fixable = ["D", "DOC", "E", "F", "I"]
 ignore = ["E501", "E722"]
 
 [tool.ruff.format]
