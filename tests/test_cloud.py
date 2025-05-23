@@ -9,21 +9,41 @@ except ImportError:
 pytestmark = pytest.mark.usefixtures("mocker")
 
 
-@pytest.mark.skipif(moto is None, reason="moto not installed")
-def test_upload_to_s3_success(tmp_path):
-    import boto3
-    from moto import mock_s3
+def test_upload_to_s3_success(mocker):
+    # Minimal in-memory S3 fake
+    class FakeS3Client:
+        def __init__(self):
+            self.buckets = {}
+
+        def create_bucket(self, Bucket):
+            self.buckets[Bucket] = {}
+
+        def put_object(self, Bucket, Key, Body):
+            self.buckets.setdefault(Bucket, {})[Key] = Body
+
+        def get_object(self, Bucket, Key):
+            # Simulate boto3's streaming body with bytes
+            class Body:
+                def __init__(self, data):
+                    self._data = data
+
+                def read(self):
+                    return self._data
+
+            return {"Body": Body(self.buckets[Bucket][Key])}
+
+    fake_s3 = FakeS3Client()
+    mocker.patch("boto3.client", return_value=fake_s3)
 
     bucket = "mybucket"
     key = "recap/test.json"
     data = b'{"foo": "bar"}'
     s3_uri = f"s3://{bucket}/{key}"
-    with mock_s3():
-        s3 = boto3.client("s3", region_name="us-east-1")
-        s3.create_bucket(Bucket=bucket)
-        _upload_to_s3(s3_uri, data)
-        obj = s3.get_object(Bucket=bucket, Key=key)
-        assert obj["Body"].read() == data
+
+    fake_s3.create_bucket(Bucket=bucket)
+    _upload_to_s3(s3_uri, data)
+    obj = fake_s3.get_object(Bucket=bucket, Key=key)
+    assert obj["Body"].read() == data
 
 
 def test_upload_to_gcs_success(mocker):

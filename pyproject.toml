@@ -44,6 +44,7 @@ testpaths = ["tests"]
 [dependency-groups]
 dev = [
     "azure-storage-blob>=12.25.1",
+    "boto3>=1.38.22",
     "google-cloud-storage>=3.1.0",
     "isort>=6.0.1",
     "pre-commit>=4.2.0",
