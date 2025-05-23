@@ -3,16 +3,16 @@ import re
 
 def upload_to_cloud(uri, data):
     if uri.startswith("s3://"):
-        return upload_to_s3(uri, data)
+        return _upload_to_s3(uri, data)
     elif uri.startswith("gs://"):
-        return upload_to_gcs(uri, data)
+        return _upload_to_gcs(uri, data)
     elif uri.startswith("azure://") or uri.startswith("https://"):
-        return upload_to_azure(uri, data)
+        return _upload_to_azure(uri, data)
     else:
         raise ValueError(f"Unknown cloud URI scheme: {uri}")
 
 
-def upload_to_s3(uri, data):
+def _upload_to_s3(uri, data):
     import boto3
 
     m = re.match(r"s3://([^/]+)/(.+)", uri)
@@ -23,7 +23,7 @@ def upload_to_s3(uri, data):
     s3.put_object(Bucket=bucket, Key=key, Body=data)
 
 
-def upload_to_gcs(uri, data):
+def _upload_to_gcs(uri, data):
     from google.cloud import storage
 
     m = re.match(r"gs://([^/]+)/(.+)", uri)
@@ -36,7 +36,7 @@ def upload_to_gcs(uri, data):
     blob.upload_from_string(data)
 
 
-def upload_to_azure(uri, data):
+def _upload_to_azure(uri, data):
     from azure.storage.blob import BlobServiceClient
 
     m = re.match(r"azure://([^/]+)/(.+)", uri)
