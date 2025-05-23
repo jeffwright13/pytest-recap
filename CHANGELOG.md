@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+- New `--recap-pretty` CLI flag, `RECAP_PRETTY` environment variable, and `recap_pretty` ini option for controlling recap JSON output format (pretty-printed or minified). Default is minified. Precedence: CLI > ENV > INI > default.
+- Tests for pretty/minified output at both plugin and storage layers.
+
 ### Fixed
 - Robust handling of ini values for session metadata (now always parsed as string, even if provided as a list by pytest).
 - Warning messages for invalid session metadata now always reference the correct environment variable or CLI option, improving clarity and testability.

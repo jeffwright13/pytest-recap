@@ -39,6 +39,29 @@ For cloud storage support in tests:
 
 **Troubleshooting tip:** If you encounter issues with session metadata not being picked up, run pytest with `-s` to see debug output for ini/env/CLI value resolution.
 
+### Controlling Recap JSON Output Format
+
+By default, recap JSON output is minified (compact, no whitespace). To enable pretty-printed (indented, human-readable) output, use any of the following:
+
+- **CLI:**
+  ```bash
+  pytest --recap-pretty
+  ```
+- **Environment variable:**
+  ```bash
+  export RECAP_PRETTY=1
+  pytest
+  ```
+- **pytest.ini:**
+  ```ini
+  [pytest]
+  recap_pretty = 1
+  ```
+
+**Precedence:** CLI > Environment variable > pytest.ini > default (minified).
+
+**Tip:** Pretty-printed output is easier to read and diff, while minified output is smaller and faster to parse.
+
 Run pytest as usual. Recap output is written to `recap-session.json` by default, or to a custom file/directory/cloud URI using the `--recap-destination` option.
 
 ```bash
