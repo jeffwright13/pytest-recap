@@ -2,7 +2,7 @@
 
 Capture your test sessions. Recap the results.
 
-![pytest-recap logo](./assets/pytest-recap.png)
+![pytest-recap logo](./assets/pytest-recap-160x160.png)
 
 ## Overview
 
