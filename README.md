@@ -2,6 +2,8 @@
 
 Capture your test sessions. Recap the results.
 
+![pytest-recap logo](./assets/pytest-recap.png)
+
 ## Overview
 
 **pytest-recap** is a [pytest](https://pytest.org/) plugin that captures detailed information about your test sessions and creates a well-structured JSON file written to the location of your choice. It is designed to help you analyze, summarize, and store test outcomes for reporting and analytics.
