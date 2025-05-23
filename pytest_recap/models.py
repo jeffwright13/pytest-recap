@@ -11,7 +11,7 @@ Core models:
 import logging
 from collections import Counter
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Dict, List, Optional
 
@@ -326,7 +326,7 @@ class TestSession:
     ):
         self.session_id = session_id
         self.session_start_time = session_start_time
-        self.session_stop_time = session_stop_time or datetime.utcnow()
+        self.session_stop_time = session_stop_time or datetime.now(timezone.utc)
         self.system_under_test = system_under_test or {}
         self.session_tags = session_tags or {}
         self.testing_system = testing_system or {}

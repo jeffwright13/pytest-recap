@@ -1,7 +1,7 @@
 # This is a realistic API testing module that simulates testing a RESTful API
 import random
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import patch
 
 import pytest
@@ -35,7 +35,7 @@ def mock_user_data():
         "id": user_id,
         "username": f"testuser_{user_id}",
         "email": f"{user_id}@example.com",
-        "created": datetime.now().isoformat(),
+        "created": datetime.now(timezone.utc).isoformat(),
         "status": random.choice(["active", "inactive", "pending"]),
     }
 

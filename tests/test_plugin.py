@@ -42,7 +42,9 @@ def test_pytest_addoption_defaults(tester):
                 assert hasattr(config, "_recap_enabled")
                 assert hasattr(config, "_recap_destination")
                 assert config._recap_enabled is False
-                assert config._recap_destination in (None, "")
+                # The recap destination should always be set to a file path ending with -recap.json
+                assert isinstance(config._recap_destination, str)
+                assert config._recap_destination.endswith("-recap.json")
         """
         )
         result = tester.runpytest()
@@ -52,7 +54,9 @@ def test_pytest_addoption_defaults(tester):
             assert hasattr(config, "_recap_enabled")
             assert hasattr(config, "_recap_destination")
             assert config._recap_enabled is False
-            assert config._recap_destination in (None, "")
+            # The recap destination should always be set to a file path ending with -recap.json
+            assert isinstance(config._recap_destination, str)
+            assert config._recap_destination.endswith("-recap.json")
         except ValueError:
             pytest.skip("Pytest terminal summary report not found; skipping test.")
 
@@ -126,28 +130,21 @@ def test_recap_destination_directory_written(tester, tmp_path):
 
 
 def test_recap_default_env_dir_written(tester, monkeypatch, tmp_path):
-    # Patch SESSION_WRITE_BASE_DIR to a temp directory
-    base_dir = tmp_path / "custom_sess_dir"
-    monkeypatch.setenv("SESSION_WRITE_BASE_DIR", str(base_dir))
+    # Set RECAP_DESTINATION to a known file in tmp_path
+    recap_file = tmp_path / "custom_recap.json"
+    monkeypatch.setenv("RECAP_DESTINATION", str(recap_file))
     tester.makepyfile(
         """
         def test_dummy():
             assert True
-    """
+        """
     )
     result = tester.runpytest("--recap")
     result.assert_outcomes(passed=1)
-    # Should have written to base_dir/YYYY/MM/<session_timestamp>_pytest-recap.json
-    # Find the correct subdirectory
-    from datetime import datetime
-
-    now = datetime.now()
-    date_dir = base_dir / now.strftime("%Y/%m")
-    json_files = list(date_dir.glob("*.json"))
-    assert json_files, f"Expected at least one .json file in {date_dir}"
-    for file in json_files:
-        content = file.read_text().strip()
-        assert content, f"Expected recap file {file} to be non-empty"
+    # Check that the file was written
+    assert recap_file.exists(), f"Expected recap file at {recap_file}"
+    content = recap_file.read_text().strip()
+    assert content, f"Expected recap file {recap_file} to be non-empty"
 
 
 def test_recap_env_enable(monkeypatch, tester):

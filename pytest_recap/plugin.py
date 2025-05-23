@@ -34,7 +34,14 @@ def pytest_addoption(parser: Parser) -> None:
         help="Enable pytest-recap plugin (or set environment variable RECAP_ENABLE)",
     )
     recap_dest_env = os.environ.get("RECAP_DESTINATION")
-    recap_dest_default = recap_dest_env or ""
+    if recap_dest_env:
+        recap_dest_default = recap_dest_env
+    else:
+        # Always save in ~/.pytest-recap-sessions/ with a UTC timestamped filename
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        default_dir = os.path.expanduser("~/.pytest-recap-sessions")
+        os.makedirs(default_dir, exist_ok=True)
+        recap_dest_default = os.path.join(default_dir, f"{timestamp}-recap.json")
     group.addoption(
         "--recap-destination",
         action="store",

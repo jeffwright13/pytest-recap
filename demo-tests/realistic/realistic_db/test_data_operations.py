@@ -1,7 +1,7 @@
 # This is a realistic database testing module that simulates testing database operations
 import random
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -30,7 +30,7 @@ class MockCursor:
                     "name": "Test User",
                     "email": "test@example.com",
                     "status": "inactive",
-                    "created": datetime.now(),
+                    "created": datetime.now(timezone.utc),
                     "value": 100.0,
                 }
             else:
@@ -39,7 +39,7 @@ class MockCursor:
                     "name": "Rollback User",
                     "email": "rollback@example.com",
                     "status": "inactive",
-                    "created": datetime.now(),
+                    "created": datetime.now(timezone.utc),
                     "value": 50.0,
                 }
             self._pending_inserts.append(("users", record))
@@ -47,7 +47,7 @@ class MockCursor:
             record = {
                 "id": 1,
                 "name": "Test Record",
-                "created": datetime.now(),
+                "created": datetime.now(timezone.utc),
             }
             self._pending_inserts.append(("test_schema.test_table", record))
 
@@ -119,7 +119,7 @@ class MockCursor:
         return {
             "id": random.randint(1, 10000),
             "name": f"Item-{random.randint(1000, 9999)}",
-            "created": datetime.now() - timedelta(days=random.randint(0, 30)),
+            "created": datetime.now(timezone.utc) - timedelta(days=random.randint(0, 30)),
             "status": random.choice(["active", "inactive", "pending", "archived"]),
             "value": round(random.uniform(10, 1000), 2),
         }

@@ -1,7 +1,7 @@
 # This is a realistic integration testing module that simulates testing end-to-end workflows
 import random
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import patch
 
 import pytest
@@ -161,7 +161,7 @@ class MockOrderService:
             "items": order_items,
             "total": order_total,
             "status": "created",
-            "created": datetime.now().isoformat(),
+            "created": datetime.now(timezone.utc).isoformat(),
         }
         return {"success": True, "order_id": order_id, "total": order_total}
 
@@ -219,7 +219,7 @@ class MockPaymentService:
             "amount": amount,
             "payment_method": payment_method,
             "status": "completed",
-            "created": datetime.now().isoformat(),
+            "created": datetime.now(timezone.utc).isoformat(),
         }
 
         return {"success": True, "payment_id": payment_id, "status": "completed"}
