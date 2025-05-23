@@ -171,3 +171,23 @@ def test_storage_append_sessions(tmp_path):
         storage.save_session(session)
     loaded = storage.load_sessions()
     assert len(loaded) == 200
+
+
+def test_storage_minified_and_pretty(tmp_path):
+    data = {"foo": [1, 2, 3], "bar": {"baz": "qux"}}
+    file_min = tmp_path / "minified.json"
+    file_pretty = tmp_path / "pretty.json"
+
+    # Minified (indent=None)
+    storage_min = JSONStorage(file_path=file_min)
+    storage_min.save_single_session(data, indent=None)
+    minified = file_min.read_text()
+    assert minified.count("\n") <= 1
+    assert minified.replace(" ", "").startswith('{"foo"')
+
+    # Pretty (indent=2)
+    storage_pretty = JSONStorage(file_path=file_pretty)
+    storage_pretty.save_single_session(data, indent=2)
+    pretty = file_pretty.read_text()
+    assert pretty.count("\n") > 1
+    assert pretty.startswith("{\n") or pretty.startswith("{\r\n")

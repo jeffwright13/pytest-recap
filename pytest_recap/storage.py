@@ -41,7 +41,7 @@ class JSONStorage:
             with FileLock(self.lock_path):
                 self._write_json([])
 
-    def save_session(self, session_data: dict, single: bool = False) -> None:
+    def save_session(self, session_data: dict, single: bool = False, indent=2) -> None:
         """
         Save a session. If single=True, write as a dict (overwrite file). If False (default), append to list (archive mode).
         In archive mode, always writes a list. If the file is a dict or empty, starts a new list.
@@ -50,7 +50,7 @@ class JSONStorage:
         with self._thread_lock:
             with FileLock(self.lock_path):
                 if single:
-                    self._write_json(session_data)
+                    self._write_json(session_data, indent=indent)
                 else:
                     try:
                         sessions = self.load_sessions(lock=False)
@@ -59,16 +59,16 @@ class JSONStorage:
                     except Exception:
                         sessions = []
                     sessions.append(session_data)
-                    self._write_json(sessions)
+                    self._write_json(sessions, indent=indent)
             # Only clean up lock files if the above succeeded
             self._cleanup_zero_byte_lock_files()
 
-    def save_single_session(self, session_data: dict) -> None:
+    def save_single_session(self, session_data: dict, indent=2) -> None:
         """
         Save a single session as a dict (overwrite file). For plugin recap output.
         """
         with self._thread_lock:
-            self.save_session(session_data, single=True)
+            self.save_session(session_data, single=True, indent=indent)
             self._cleanup_zero_byte_lock_files()
 
     def load_sessions(self, lock: bool = True) -> List[dict]:
@@ -101,7 +101,7 @@ class JSONStorage:
         except (FileNotFoundError, json.JSONDecodeError):
             return []
 
-    def _write_json(self, data) -> None:
+    def _write_json(self, data, indent=2) -> None:
         """
         Atomically write JSON data to self.file_path using a temp file and os.replace for durability and crash-safety.
         Raises PermissionError if the file is not writable.
@@ -109,7 +109,7 @@ class JSONStorage:
         tmp_path = self.file_path.with_suffix(".tmp")
         try:
             with open(tmp_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2)
+                json.dump(data, f, indent=indent)
                 f.flush()
                 os.fsync(f.fileno())
             os.replace(str(tmp_path), str(self.file_path))

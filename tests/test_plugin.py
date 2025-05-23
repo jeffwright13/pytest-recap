@@ -397,3 +397,38 @@ def test_recap_cloud_destination(monkeypatch, tester, mocker, cloud_uri):
     assert isinstance(args[1], bytes)
     # Ensure the terminal output mentions the cloud URI
     assert cloud_uri in result.stdout.str()
+
+
+@pytest.mark.parametrize(
+    "cli_flag,env_val,ini_val,should_pretty",
+    [
+        ("--recap-pretty", None, None, True),  # CLI flag
+        (None, "1", None, True),  # ENV var
+        (None, None, "1", True),  # INI option
+        (None, None, None, False),  # Default (minified)
+        (None, "0", None, False),  # ENV explicitly off
+        (None, None, "0", False),  # INI explicitly off
+    ],
+)
+def test_recap_pretty_and_minified(monkeypatch, tester, tmp_path, cli_flag, env_val, ini_val, should_pretty):
+    dest_file = tmp_path / "recap-pretty.json"
+    monkeypatch.setenv("RECAP_ENABLE", "1")
+    if env_val is not None:
+        monkeypatch.setenv("RECAP_PRETTY", env_val)
+    if ini_val is not None:
+        tester.makeini(f"[pytest]\nrecap_pretty = {ini_val}\n")
+    tester.makepyfile("def test_dummy(): assert True\n")
+    args = [f"--recap-destination={dest_file}"]
+    if cli_flag:
+        args.append(cli_flag)
+    result = tester.runpytest(*args)
+    result.assert_outcomes(passed=1)
+    assert dest_file.exists()
+    text = dest_file.read_text()
+    # Pretty JSON will have newlines and indents, minified will not
+    if should_pretty:
+        assert text.count("\n") > 1, "Expected pretty output with newlines"
+        assert text.startswith("{\n") or text.startswith("{\r\n")
+    else:
+        assert text.count("\n") <= 1, "Expected minified output"
+        assert text.replace(" ", "").startswith('{"')

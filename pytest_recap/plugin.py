@@ -66,10 +66,17 @@ def pytest_addoption(parser: Parser) -> None:
         default=None,
         help="JSON or Python dict string for session tags (or set RECAP_SESSION_TAGS)",
     )
+    group.addoption(
+        "--recap-pretty",
+        action="store_true",
+        default=None,
+        help="Pretty-print recap JSON output (or set RECAP_PRETTY=1, or ini: recap_pretty=1)",
+    )
     # Add ini options for fallback
     parser.addini("recap_system_under_test", "System under test dict (JSON or Python dict string)", default="")
     parser.addini("recap_testing_system", "Testing system dict (JSON or Python dict string)", default="")
     parser.addini("recap_session_tags", "Session tags dict (JSON or Python dict string)", default="")
+    parser.addini("recap_pretty", "Pretty-print recap JSON output (1 for pretty, 0 for minified)", default="0")
 
 
 def pytest_configure(config: Config) -> None:
@@ -80,6 +87,11 @@ def pytest_configure(config: Config) -> None:
     """
     config._recap_enabled = config.getoption("--recap")
     config._recap_destination = config.getoption("--recap-destination")
+    # Determine pretty output (CLI > ENV > INI > default)
+    from pytest_recap.plugin import get_recap_option
+
+    pretty_val = get_recap_option(config, "recap_pretty", "recap_pretty", "RECAP_PRETTY", default="0")
+    config._recap_pretty = str(pretty_val).strip().lower() in ("1", "true", "yes", "y")
 
 
 # --- pytest-recap-specific functions only used internally --- #
@@ -343,7 +355,10 @@ def write_recap_file(session: TestSession, destination: str, terminalreporter: T
     """
     recap_data: Dict = session.to_dict()
     now: datetime = datetime.now(timezone.utc)
-    json_bytes: bytes = json.dumps(recap_data, indent=2).encode("utf-8")
+    # Detect pretty output from config if available
+    pretty = getattr(getattr(terminalreporter, "config", None), "_recap_pretty", False)
+    indent = 2 if pretty else None
+    json_bytes: bytes = json.dumps(recap_data, indent=indent).encode("utf-8")
 
     # Cloud URI detection and dispatch
     if destination and (
@@ -380,7 +395,8 @@ def write_recap_file(session: TestSession, destination: str, terminalreporter: T
             filepath = os.path.join(date_dir, filename)
         try:
             storage = JSONStorage(filepath)
-            storage.save_single_session(recap_data)
+            # Pass indent to storage for pretty/minified output
+            storage.save_single_session(recap_data, indent=indent)
         except Exception as e:
             terminalreporter.write_line(f"RECAP PLUGIN ERROR: {e}")
             raise
