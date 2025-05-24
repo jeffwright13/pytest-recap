@@ -1,20 +1,25 @@
 # pytest-recap
 
-Capture your test sessions. Recap the results.
+"Capture your test sessions. Recap the results."
 
-![pytest-recap logo](./assets/pytest-recap-160x160.png)
+![pytest-recap logo](./assets/combo.png)
 
 ## Overview
 
 **pytest-recap** is a [pytest](https://pytest.org/) plugin that captures detailed information about your test sessions and creates a well-structured JSON file written to the location of your choice. It is designed to help you analyze, summarize, and store test outcomes for reporting and analytics.
 
-### Key Features
+The **recap** is a structured summary of one or more pytest test sessions, presenting key outcomes, such as passed, failed, or skipped tests; alongside supporting details—like error messages, tracebacks, warnings, and test metadata—that provide context and explanation for each summarized result. The recap enables users to quickly understand the overall state of their test suite while also allowing them to drill down into the specifics behind each summarized result.
 
-- **Comprehensive session recap**: Records all test outcomes, timings, logs, and more.
-- **Cloud storage support**: Write recaps directly to AWS S3 (`s3://`), Google Cloud Storage (`gs://`), or Azure Blob Storage (`azure://`).
-- **User-definable metadata**: Configure system under test, testing system, and session tags.
-- **Rerun group tracking**: Handles flaky/rerun tests with group summaries.
-- **Color-highlighted output**: Recap file path/URI is colorized in the terminal.
+Beyond immediate reporting, a recap serves as a robust platform for post-analysis: by organizing both summary and details in a machine-readable and navigable format, it empowers users to perform trend analysis, root cause investigation, historical comparisons, and custom reporting. This makes pytest-recap not just a reporting tool, but a foundation for deeper quality insights and continuous improvement.
+
+- Concise overview of test outcomes (summary)
+- Direct links or references to detailed supporting information (details)
+- Designed for clarity, traceability, and actionable insight into pytest test runs
+- Facilitates post-analysis, trend detection, and data-driven decision making
+- Comprehensive session recap: records all local test outcomes, timings, logs, and more.
+- Cloud storage support: write recaps to file, or to AWS S3 (`s3://`), Google Cloud Storage (`gs://`), or Azure Blob Storage (`azure://`).
+- User-definable metadata: configure system-under-test, testing-system, and session-tags.
+- Rerun group tracking: handles flaky/rerun tests with group summaries.
 
 ---
 
