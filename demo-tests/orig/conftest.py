@@ -15,7 +15,10 @@ _sentences = [s.strip() for s in data.split(".") if s.strip()]
 
 @pytest.fixture
 def fake_data() -> str:
-    base = random.choice(_sentences)
+    """Return a string of 1 to 3 random ipsum sentences, joined together with spaces and ending with random punctuation."""
+    num_sentences = random.randint(1, 3)
+    sentences = random.sample(_sentences, k=num_sentences)
+    base = " ".join(sentences)
     punctuation = random.choice([".", ";", "?"])
     return base + punctuation
 
@@ -37,3 +40,12 @@ def logger():
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
     return logger
+
+
+@pytest.fixture
+def random_sleep():
+    """Sleep for a random time between 1.0 and 5.0 seconds."""
+    import time
+
+    duration = random.uniform(1.0, 5.0)
+    time.sleep(duration)
