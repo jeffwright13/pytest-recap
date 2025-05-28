@@ -13,14 +13,13 @@ from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 
 class TestOutcome(Enum):
-    """
-    Test outcome states.
+    """Test outcome states.
 
     Enum values:
         PASSED: Test passed
@@ -44,13 +43,14 @@ class TestOutcome(Enum):
 
     @classmethod
     def from_str(cls, outcome: Optional[str]) -> "TestOutcome":
-        """
-        Convert string to TestOutcome, always uppercase internally.
+        """Convert string to TestOutcome, always uppercase internally.
 
         Args:
             outcome (Optional[str]): Outcome string.
+
         Returns:
             TestOutcome: Corresponding enum value.
+
         """
         if not outcome:
             return cls.SKIPPED  # Return a default enum value instead of None
@@ -60,38 +60,37 @@ class TestOutcome(Enum):
             raise ValueError(f"Invalid test outcome: {outcome}")
 
     def to_str(self) -> str:
-        """
-        Convert TestOutcome to string, always lowercase externally.
+        """Convert TestOutcome to string, always lowercase externally.
 
         Returns:
             str: Lowercase outcome string.
+
         """
         return self.value.lower()
 
     @classmethod
     def to_list(cls) -> List[str]:
-        """
-        Convert entire TestOutcome enum to a list of possible string values.
+        """Convert entire TestOutcome enum to a list of possible string values.
 
         Returns:
             List[str]: List of lowercase outcome strings.
+
         """
         return [outcome.value.lower() for outcome in cls]
 
     def is_failed(self) -> bool:
-        """
-        Check if the outcome represents a failure.
+        """Check if the outcome represents a failure.
 
         Returns:
             bool: True if outcome is failure or error, else False.
+
         """
         return self in (self.FAILED, self.ERROR)
 
 
 @dataclass
 class TestResult:
-    """
-    Represents a single test result for an individual test run.
+    """Represents a single test result for an individual test run.
 
     Attributes:
         nodeid (str): Unique identifier for the test node.
@@ -103,6 +102,7 @@ class TestResult:
         capstderr (str): Captured stderr output.
         capstdout (str): Captured stdout output.
         longreprtext (str): Long representation of failure, if any.
+
     """
 
     __test__ = False  # Tell Pytest this is NOT a test class
@@ -120,11 +120,11 @@ class TestResult:
     has_error: bool = False
 
     def __post_init__(self):
-        """
-        Validate and process initialization data.
+        """Validate and process initialization data.
 
         Raises:
             ValueError: If neither stop_time nor duration is provided.
+
         """
         # Only compute stop_time if both start_time and duration are present and stop_time is missing
         if self.stop_time is None and self.start_time is not None and self.duration is not None:
@@ -134,11 +134,11 @@ class TestResult:
             self.duration = (self.stop_time - self.start_time).total_seconds()
 
     def to_dict(self) -> Dict:
-        """
-        Convert test result to a dictionary for JSON serialization.
+        """Convert test result to a dictionary for JSON serialization.
 
         Returns:
             dict: Dictionary representation of the test result.
+
         """
         # Handle both string and enum outcomes for backward compatibility
         if not hasattr(self.outcome, "to_str"):
@@ -191,12 +191,12 @@ class TestResult:
 
 @dataclass
 class RerunTestGroup:
-    """
-    Groups test results for tests that were rerun, chronologically ordered with final result last.
+    """Groups test results for tests that were rerun, chronologically ordered with final result last.
 
     Attributes:
         nodeid (str): Test node ID.
         tests (List[TestResult]): List of TestResult objects for each rerun.
+
     """
 
     __test__ = False
@@ -205,22 +205,22 @@ class RerunTestGroup:
     tests: List[TestResult] = field(default_factory=list)
 
     def add_test(self, result: "TestResult"):
-        """
-        Add a test result and maintain chronological order.
+        """Add a test result and maintain chronological order.
 
         Args:
             result (TestResult): TestResult to add.
+
         """
         self.tests.append(result)
         self.tests.sort(key=lambda t: t.start_time)
 
     @property
     def final_outcome(self):
-        """
-        Get the outcome of the final test (non-RERUN and non-ERROR).
+        """Get the outcome of the final test (non-RERUN and non-ERROR).
 
         Returns:
             Optional[TestOutcome]: Final outcome if available.
+
         """
         outcomes = [t.outcome for t in self.tests]
         if TestOutcome.FAILED in outcomes:
@@ -228,23 +228,24 @@ class RerunTestGroup:
         return outcomes[-1] if outcomes else None
 
     def to_dict(self) -> Dict:
-        """
-        Convert to dictionary for JSON serialization.
+        """Convert to dictionary for JSON serialization.
 
         Returns:
             dict: Dictionary representation of the rerun group.
+
         """
         return {"nodeid": self.nodeid, "tests": [t.to_dict() for t in self.tests]}
 
     @classmethod
     def from_dict(cls, data: Dict) -> "RerunTestGroup":
-        """
-        Create RerunTestGroup from dictionary.
+        """Create RerunTestGroup from dictionary.
 
         Args:
             data (Dict): Dictionary representation of the rerun group.
+
         Returns:
             RerunTestGroup: Instantiated RerunTestGroup object.
+
         """
         if not isinstance(data, dict):
             raise ValueError(f"Invalid data for RerunTestGroup. Expected dict, got {type(data)}")
@@ -261,9 +262,9 @@ class TestSessionStats:
     """Aggregates test outcome statistics for a session."""
 
     def __init__(self, test_results):
-        """
-        Args:
-            test_results (Iterable[TestResult]): List of TestResult objects.
+        """Args:
+        test_results (Iterable[TestResult]): List of TestResult objects.
+
         """
         self.counter = Counter(
             str(getattr(test_result, "outcome", test_result)).lower() for test_result in test_results
@@ -275,28 +276,27 @@ class TestSessionStats:
         return self.counter.get(str(outcome).lower(), 0)
 
     def as_dict(self):
-        """
-        Return all outcome counts as a dict.
+        """Return all outcome counts as a dict.
 
         Returns:
             dict: Dictionary of outcome counts.
+
         """
         return dict(self.counter)
 
     def __str__(self):
-        """
-        Return a string representation of the TestSessionStats object.
+        """Return a string representation of the TestSessionStats object.
 
         Returns:
             str: String representation of the TestSessionStats object.
+
         """
         return f"TestSessionStats(total={self.total}, {dict(self.counter)})"
 
 
 @dataclass
 class TestSession:
-    """
-    Represents a test session recap with session-level metadata, results.
+    """Represents a test session recap with session-level metadata, results.
 
     Attributes:
         session_id (str): Unique session identifier.
@@ -308,6 +308,7 @@ class TestSession:
         test_results (List[TestResult]): List of test results in the session.
         rerun_test_groups (List[RerunTestGroup]): Groups of rerun tests.
         session_stats (TestSessionStats): Test session statistics.
+
     """
 
     __test__ = False  # Tell Pytest this is NOT a test class
@@ -322,6 +323,8 @@ class TestSession:
         testing_system: dict = None,
         test_results: list = None,
         rerun_test_groups: list = None,
+        warnings: Optional[List[Dict[str, Any]]] = None,
+        errors: Optional[List[Dict[str, Any]]] = None,
         session_stats: TestSessionStats = None,
     ):
         self.session_id = session_id
@@ -332,14 +335,16 @@ class TestSession:
         self.testing_system = testing_system or {}
         self.test_results = test_results or []
         self.rerun_test_groups = rerun_test_groups or []
+        self.warnings = warnings or []
+        self.errors = errors or []
         self.session_stats = session_stats or TestSessionStats(self.test_results)
 
     def to_dict(self) -> Dict:
-        """
-        Convert TestSession to a dictionary for JSON serialization.
+        """Convert TestSession to a dictionary for JSON serialization.
 
         Returns:
             dict: Dictionary representation of the test session.
+
         """
         return {
             "session_id": self.session_id,
@@ -353,6 +358,8 @@ class TestSession:
                 {"nodeid": group.nodeid, "tests": [t.to_dict() for t in group.tests]}
                 for group in self.rerun_test_groups
             ],
+            "warnings": self.warnings,
+            "errors": self.errors,
             "session_stats": self.session_stats.as_dict() if self.session_stats else {},
         }
 
@@ -382,13 +389,14 @@ class TestSession:
         )
 
     def add_test_result(self, result: TestResult) -> None:
-        """
-        Add a test result to this session.
+        """Add a test result to this session.
 
         Args:
             result (TestResult): TestResult to add.
+
         Raises:
             ValueError: If result is not a TestResult instance.
+
         """
         if not isinstance(result, TestResult):
             raise ValueError(
@@ -398,13 +406,14 @@ class TestSession:
         self.test_results.append(result)
 
     def add_rerun_group(self, group: RerunTestGroup) -> None:
-        """
-        Add a rerun test group to this session.
+        """Add a rerun test group to this session.
 
         Args:
             group (RerunTestGroup): RerunTestGroup to add.
+
         Raises:
             ValueError: If group is not a RerunTestGroup instance.
+
         """
         if not isinstance(group, RerunTestGroup):
             raise ValueError(

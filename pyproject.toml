@@ -35,8 +35,8 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-select = ["D", "DOC", "E", "F", "I"]
-fixable = ["D", "DOC", "E", "F", "I"]
+select = ["E", "F", "I"]
+fixable = ["E", "F", "I"]
 ignore = ["E501", "E722"]
 
 [tool.ruff.format]

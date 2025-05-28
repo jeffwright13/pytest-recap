@@ -18,11 +18,13 @@ from pytest_recap.models import RerunTestGroup, TestResult, TestSession
 from pytest_recap.storage import JSONStorage
 
 
+# --- pytest hooks --- #
 def pytest_addoption(parser: Parser) -> None:
     """Add command line options for pytest-recap, supporting environment variable defaults.
 
     Args:
         parser (Parser): The pytest parser object.
+
     """
     group = parser.getgroup("Pytest Recap")
     recap_env = os.environ.get("RECAP_ENABLE", "0").lower()
@@ -37,7 +39,6 @@ def pytest_addoption(parser: Parser) -> None:
     if recap_dest_env:
         recap_dest_default = recap_dest_env
     else:
-        # Always save in ~/.pytest-recap-sessions/ with a UTC timestamped filename
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
         default_dir = os.path.expanduser("~/.pytest-recap-sessions")
         os.makedirs(default_dir, exist_ok=True)
@@ -72,7 +73,7 @@ def pytest_addoption(parser: Parser) -> None:
         default=None,
         help="Pretty-print recap JSON output (or set RECAP_PRETTY=1, or ini: recap_pretty=1)",
     )
-    # Add ini options for fallback
+
     parser.addini("recap_system_under_test", "System under test dict (JSON or Python dict string)", default="")
     parser.addini("recap_testing_system", "Testing system dict (JSON or Python dict string)", default="")
     parser.addini("recap_session_tags", "Session tags dict (JSON or Python dict string)", default="")
@@ -83,18 +84,35 @@ def pytest_configure(config: Config) -> None:
     """Configure pytest-recap plugin.
 
     Args:
-        config (Config): The pytest config object.
+        config (Config): The pytest Config object.
+
     """
-    config._recap_enabled = config.getoption("--recap")
-    config._recap_destination = config.getoption("--recap-destination")
-    # Determine pretty output (CLI > ENV > INI > default)
-    from pytest_recap.plugin import get_recap_option
-
-    pretty_val = get_recap_option(config, "recap_pretty", "recap_pretty", "RECAP_PRETTY", default="0")
-    config._recap_pretty = str(pretty_val).strip().lower() in ("1", "true", "yes", "y")
+    config._recap_enabled: bool = config.getoption("--recap")
+    config._recap_destination: str = config.getoption("--recap-destination")
+    pretty = get_recap_option(config, "recap_pretty", "recap_pretty", "RECAP_PRETTY", default="0")
+    config._recap_pretty: bool = str(pretty).strip().lower() in {"1", "true", "yes", "y"}
 
 
-# --- pytest-recap-specific functions only used internally --- #
+@pytest.hookimpl(hookwrapper=True)
+def pytest_terminal_summary(terminalreporter: TerminalReporter, exitstatus: int, config: Config) -> None:
+    """Hook into pytest's terminal summary to collect test results and write recap file."""
+    yield
+
+    if not getattr(config, "_recap_enabled", False):
+        return
+
+    test_results_tuple: Tuple[List[TestResult], datetime, datetime] = collect_test_results_and_session_times(
+        terminalreporter
+    )
+    test_results, session_start, session_end = test_results_tuple
+    rerun_groups: List[RerunTestGroup] = build_rerun_groups(test_results)
+    session: TestSession = build_recap_session(
+        test_results, session_start, session_end, rerun_groups, terminalreporter, config
+    )
+    write_recap_file(session, getattr(config, "_recap_destination", None), terminalreporter)
+
+
+# --- pytest-recap-specific functions, only used internally --- #
 def collect_test_results_and_session_times(
     terminalreporter: TerminalReporter,
 ) -> Tuple[List[TestResult], datetime, datetime]:
@@ -102,8 +120,10 @@ def collect_test_results_and_session_times(
 
     Args:
         terminalreporter (TerminalReporter): The terminal reporter object.
+
     Returns:
         tuple: A tuple containing the list of test results, session start time, and session end time.
+
     """
     stats: Dict[str, List[TestReport]] = terminalreporter.stats
     test_results: List[TestResult] = []
@@ -150,8 +170,10 @@ def build_rerun_groups(test_results: List[TestResult]) -> List[RerunTestGroup]:
 
     Args:
         test_results (list): List of TestResult objects.
+
     Returns:
         list: List of RerunTestGroup objects, each containing reruns for a nodeid.
+
     """
     test_result_objs = [
         TestResult(
@@ -179,8 +201,7 @@ def parse_dict_option(
     envvar: str = None,
     source: str = None,
 ) -> dict:
-    """
-    Parse a recap option string value into a Python dict.
+    """Parse a recap option string value into a Python dict.
     Supports both JSON and Python dict literal formats.
     Returns the provided default if parsing fails.
     """
@@ -189,25 +210,25 @@ def parse_dict_option(
     try:
         return json.loads(option_value)
     except Exception:
-        try:
-            return ast.literal_eval(option_value)
-        except Exception as e:
-            src = f" from {source}" if source else ""
-            env_info = f" (env var: {envvar})" if envvar else ""
-            msg = (
-                f"WARNING: Invalid RECAP_{option_name.upper()} value{src}{env_info}: {option_value!r}. "
-                f"Could not parse as dict: {e}. Using default."
-            )
-            if terminalreporter:
-                terminalreporter.write_line(msg)
-            else:
-                print(msg)
-            return default
+        pass
+    try:
+        return ast.literal_eval(option_value)
+    except Exception as e:
+        src = f" from {source}" if source else ""
+        env_info = f" (env var: {envvar})" if envvar else ""
+        msg = (
+            f"WARNING: Invalid RECAP_{option_name.upper()} value{src}{env_info}: {option_value!r}. "
+            f"Could not parse as dict: {e}. Using default."
+        )
+        if terminalreporter:
+            terminalreporter.write_line(msg)
+        else:
+            print(msg)
+        return default
 
 
 def get_recap_option(config, opt, ini, envvar, default=""):
-    """
-    Retrieve the raw option value for a recap option from CLI, environment variable, pytest.ini, or default.
+    """Retrieve the raw option value for a recap option from CLI, environment variable, pytest.ini, or default.
     This function is responsible for determining the source (precedence order: CLI > env > ini > default),
     but does NOT parse the value into a dict—it always returns a string.
     """
@@ -236,8 +257,7 @@ def build_recap_session(
     terminalreporter: TerminalReporter,
     config: Config,
 ) -> TestSession:
-    """
-    Build a TestSession object summarizing the test session.
+    """Build a TestSession object summarizing the test session.
 
     Args:
         test_results (list): List of test result dicts.
@@ -246,10 +266,13 @@ def build_recap_session(
         rerun_groups (list): List of RerunTestGroup objects.
         terminalreporter: Pytest terminal reporter.
         config: Pytest config object.
+
     Returns:
         TestSession: The constructed test session object.
+
     Notes:
         - session_tags, system_under_test, and testing_system can be set via CLI, env, or pytest.ini.
+
     """
     session_timestamp: str = session_start.strftime("%Y%m%d-%H%M%S")
     session_id: str = f"{session_timestamp}-{str(uuid.uuid4())[:8]}".lower()
@@ -343,15 +366,16 @@ def build_recap_session(
 
 
 def write_recap_file(session: TestSession, destination: str, terminalreporter: TerminalReporter):
-    """
-    Write the recap session data to a file in JSON format.
+    """Write the recap session data to a file in JSON format.
 
     Args:
         session (TestSession): The session recap object to write.
         destination (str): File or directory path for output. If None, a default location is used.
         terminalreporter: Pytest terminal reporter for output.
+
     Raises:
         Exception: If writing the recap file fails.
+
     """
     recap_data: Dict = session.to_dict()
     now: datetime = datetime.now(timezone.utc)
@@ -407,22 +431,3 @@ def write_recap_file(session: TestSession, destination: str, terminalreporter: T
     RESET = "\033[0m"
     blue_path = f"Recap JSON written to: {BLUE}{filepath}{RESET}"
     terminalreporter.write_line(blue_path)
-
-
-@pytest.hookimpl(hookwrapper=True)
-def pytest_terminal_summary(terminalreporter: TerminalReporter, exitstatus: int, config: Config) -> None:
-    """Hook into pytest's terminal summary to collect test results and write recap file."""
-    yield
-
-    if not getattr(config, "_recap_enabled", False):
-        return
-
-    test_results_tuple: Tuple[List[TestResult], datetime, datetime] = collect_test_results_and_session_times(
-        terminalreporter
-    )
-    test_results, session_start, session_end = test_results_tuple
-    rerun_groups: List[RerunTestGroup] = build_rerun_groups(test_results)
-    session: TestSession = build_recap_session(
-        test_results, session_start, session_end, rerun_groups, terminalreporter, config
-    )
-    write_recap_file(session, getattr(config, "_recap_destination", None), terminalreporter)
