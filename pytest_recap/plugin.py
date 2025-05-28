@@ -6,6 +6,7 @@ import socket
 import uuid
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
+from warnings import WarningMessage
 
 import pytest
 from _pytest.config import Config
@@ -14,7 +15,7 @@ from _pytest.reports import TestReport
 from _pytest.terminal import TerminalReporter
 
 from pytest_recap.cloud import upload_to_cloud
-from pytest_recap.models import RerunTestGroup, TestResult, TestSession
+from pytest_recap.models import RecapEvent, RerunTestGroup, TestResult, TestSession, TestSessionStats
 from pytest_recap.storage import JSONStorage
 
 
@@ -24,7 +25,6 @@ def pytest_addoption(parser: Parser) -> None:
 
     Args:
         parser (Parser): The pytest parser object.
-
     """
     group = parser.getgroup("Pytest Recap")
     recap_env = os.environ.get("RECAP_ENABLE", "0").lower()
@@ -85,7 +85,6 @@ def pytest_configure(config: Config) -> None:
 
     Args:
         config (Config): The pytest Config object.
-
     """
     config._recap_enabled: bool = config.getoption("--recap")
     config._recap_destination: str = config.getoption("--recap-destination")
@@ -93,9 +92,48 @@ def pytest_configure(config: Config) -> None:
     config._recap_pretty: bool = str(pretty).strip().lower() in {"1", "true", "yes", "y"}
 
 
+# --- Global warning collection. This is required because Pytest hook pytest-warning-recorded
+# does not pass the Config object, so it cannot be used to store warnings.
+_collected_warnings = []
+
+
+def pytest_sessionstart(session):
+    """Reset collected warnings at the start of each test session."""
+    global _collected_warnings
+    _collected_warnings = []
+
+
+def pytest_warning_recorded(warning_message: WarningMessage, when: str, nodeid: str, location: tuple):
+    """Collect warnings during pytest session for recap reporting.
+
+    Args:
+        warning_message (WarningMessage): The warning message object.
+        when (str): When the warning was recorded (e.g., 'call', 'setup', etc.).
+        nodeid (str): Node ID of the test (if any).
+        location (tuple): Location tuple (filename, lineno, function).
+    """
+    _collected_warnings.append(
+        RecapEvent(
+            nodeid=nodeid,
+            when=when,
+            message=str(warning_message.message),
+            category=getattr(warning_message.category, "__name__", str(warning_message.category)),
+            filename=warning_message.filename,
+            lineno=warning_message.lineno,
+            location=location,
+        )
+    )
+
+
 @pytest.hookimpl(hookwrapper=True)
 def pytest_terminal_summary(terminalreporter: TerminalReporter, exitstatus: int, config: Config) -> None:
-    """Hook into pytest's terminal summary to collect test results and write recap file."""
+    """Hook into pytest's terminal summary to collect test results, errors, warnings, and write recap file.
+
+    Args:
+        terminalreporter (TerminalReporter): The pytest terminal reporter object.
+        exitstatus (int): Exit status of the pytest session.
+        config (Config): The pytest config object.
+    """
     yield
 
     if not getattr(config, "_recap_enabled", False):
@@ -106,9 +144,42 @@ def pytest_terminal_summary(terminalreporter: TerminalReporter, exitstatus: int,
     )
     test_results, session_start, session_end = test_results_tuple
     rerun_groups: List[RerunTestGroup] = build_rerun_groups(test_results)
+
+    errors = [
+        RecapEvent(
+            nodeid=getattr(rep, "nodeid", None),
+            when=getattr(rep, "when", None),
+            outcome=getattr(rep, "outcome", None),
+            longrepr=str(getattr(rep, "longrepr", "")),
+            sections=list(getattr(rep, "sections", [])),
+            keywords=list(getattr(rep, "keywords", [])),
+            # message, category, filename, lineno, location use defaults
+        )
+        for rep in terminalreporter.stats.get("error", [])
+    ]
+
+    warnings = _collected_warnings.copy()
+
     session: TestSession = build_recap_session(
-        test_results, session_start, session_end, rerun_groups, terminalreporter, config
+        test_results, session_start, session_end, rerun_groups, errors, warnings, terminalreporter, config
     )
+    # Print summary of warnings and errors using RecapEvent helpers
+    warning_count = sum(1 for w in warnings if w.is_warning())
+    error_count = sum(1 for e in errors if e.is_error())
+    terminalreporter.write_sep("-", f"Recap: {warning_count} warnings, {error_count} errors collected")
+
+    # Optionally, print details
+    if warning_count > 0:
+        terminalreporter.write_line("\nWarnings:")
+        for w in warnings:
+            if w.is_warning():
+                terminalreporter.write_line(f"  {w.filename}:{w.lineno} [{w.category}] {w.message}")
+    if error_count > 0:
+        terminalreporter.write_line("\nErrors:")
+        for e in errors:
+            if e.is_error():
+                terminalreporter.write_line(f"  {e.nodeid} [{e.when}] {e.longrepr}")
+
     write_recap_file(session, getattr(config, "_recap_destination", None), terminalreporter)
 
 
@@ -239,8 +310,6 @@ def get_recap_option(config, opt, ini, envvar, default=""):
     if env_val is not None and str(env_val).strip() != "":
         return env_val
     ini_val = config.getini(ini)
-    # Debug: show ini value, its repr, and type
-    print(f"DEBUG: config.getini({ini!r}) = {ini_val!r} (type={type(ini_val)})")
     # If ini_val is a list (possible for ini options), join to string
     if isinstance(ini_val, list):
         ini_val = " ".join(str(x) for x in ini_val).strip()
@@ -254,6 +323,8 @@ def build_recap_session(
     session_start: datetime,
     session_end: datetime,
     rerun_groups: List[RerunTestGroup],
+    errors: List[Dict],
+    warnings: List[Dict],
     terminalreporter: TerminalReporter,
     config: Config,
 ) -> TestSession:
@@ -276,18 +347,6 @@ def build_recap_session(
     """
     session_timestamp: str = session_start.strftime("%Y%m%d-%H%M%S")
     session_id: str = f"{session_timestamp}-{str(uuid.uuid4())[:8]}".lower()
-
-    # Debug output: show raw values before parsing
-    if terminalreporter:
-        terminalreporter.write_line(
-            f"DEBUG: Raw session_tags value: {get_recap_option(config, 'recap_session_tags', 'recap_session_tags', 'RECAP_SESSION_TAGS')}"
-        )
-        terminalreporter.write_line(
-            f"DEBUG: Raw system_under_test value: {get_recap_option(config, 'recap_system_under_test', 'recap_system_under_test', 'RECAP_SYSTEM_UNDER_TEST')}"
-        )
-        terminalreporter.write_line(
-            f"DEBUG: Raw testing_system value: {get_recap_option(config, 'recap_testing_system', 'recap_testing_system', 'RECAP_TESTING_SYSTEM')}"
-        )
 
     # Session tags
     session_tags = parse_dict_option(
@@ -339,19 +398,10 @@ def build_recap_session(
         session_tags = {}
 
     # Session stats
-    session_stats: Dict[str, int] = {
-        "passed": 0,
-        "failed": 0,
-        "skipped": 0,
-        "xfailed": 0,
-        "xpassed": 0,
-        "rerun": 0,
-        "error": 0,
-    }
-    for test_result in test_results:
-        session_stats[test_result["outcome"]] += 1
-
     test_result_objs: List[TestResult] = [TestResult.from_dict(tr) for tr in test_results]
+    session_stats = TestSessionStats(test_result_objs)
+
+    # Build and return session
     session = TestSession(
         session_id=session_id,
         session_tags=session_tags,
@@ -361,6 +411,9 @@ def build_recap_session(
         session_stop_time=session_end,
         test_results=test_result_objs,
         rerun_test_groups=rerun_groups,
+        errors=errors,
+        warnings=warnings,
+        session_stats=session_stats,
     )
     return session
 
@@ -379,9 +432,8 @@ def write_recap_file(session: TestSession, destination: str, terminalreporter: T
     """
     recap_data: Dict = session.to_dict()
     now: datetime = datetime.now(timezone.utc)
-    # Detect pretty output from config if available
-    pretty = getattr(getattr(terminalreporter, "config", None), "_recap_pretty", False)
-    indent = 2 if pretty else None
+    pretty: bool = getattr(getattr(terminalreporter, "config", None), "_recap_pretty", False)
+    indent: Optional[int] = 2 if pretty else None
     json_bytes: bytes = json.dumps(recap_data, indent=indent).encode("utf-8")
 
     # Cloud URI detection and dispatch

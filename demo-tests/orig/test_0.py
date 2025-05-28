@@ -61,33 +61,6 @@ def test_with_warning(recwarn):
     assert any("something!" in str(w.message) for w in recwarn)
 
 
-# def test0_pass_1(logger, capstdout):
-#     print("Test Pass 1!")
-#     logger.info(ZWS_X3)
-#     logger.critical("CRITICAL")
-#     logger.error("ERROR")
-#     logger.warning("WARNING")
-#     logger.info("INFO")
-#     logger.debug("DEBUG")
-#     logger.info(ZWJ_X3)
-#     warnings.warn("This is a test warning from test0_pass_1!")
-#     out = capstdout.readouterr().out
-#     assert "Test Pass 1!" in out
-#     assert True
-
-
-# def test0_pass_2_logs(logger, capstdlog):
-#     print("Test Pass 2!")
-#     logger.info(ZWS_X3)
-#     logger.critical("CRITICAL")
-#     logger.error("ERROR")
-#     logger.warning("WARNING")
-#     logger.info("INFO")
-#     logger.debug("DEBUG")
-#     logger.info(ZWJ_X3)
-#     logs = capstdlog.text
-#     assert "CRITICAL" in logs or "INFO" in logs
-#     assert True
 
 
 @pytest.fixture
@@ -95,19 +68,7 @@ def error_fixture(logger):
     raise Exception("Error in fixture")
 
 
-# def test0_pass_3_error_in_fixture(error_fixture, capstdout):
-#     print("Test Pass 3!")
-#     out = capstdout.readouterr().out
-#     assert "Test Pass 3!" in out
-#     assert True
 
-
-# def test0_fail_1(logger, capstderr):
-#     print("Test Fail 1!")
-#     print("Failing on stderr!", file=sys.stderr)
-#     err = capstderr.readouterr().err
-#     assert "Failing on stderr!" in err
-#     assert 1 == 2
 
 
 @pytest.mark.skip(reason="Skipping this test with decorator.")

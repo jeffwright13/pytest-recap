@@ -10,10 +10,10 @@ Core models:
 
 import logging
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -258,39 +258,34 @@ class RerunTestGroup:
 
 
 class TestSessionStats:
-    __test__ = False
-    """Aggregates test outcome statistics for a session."""
+    """Aggregates session-level statistics, including test outcomes and other events (e.g., warnings)."""
 
-    def __init__(self, test_results):
-        """Args:
-        test_results (Iterable[TestResult]): List of TestResult objects.
+    __test__ = False  # Tell Pytest this is NOT a test class
 
+    def __init__(self, test_results: Iterable[Any], warnings_count: int = 0):
         """
+        Args:
+            test_results (Iterable[TestResult]): List of TestResult objects.
+            warning_count (int): Number of warnings in the session.
+        """
+        # Aggregate test outcomes (e.g., passed, failed, etc.)
         self.counter = Counter(
             str(getattr(test_result, "outcome", test_result)).lower() for test_result in test_results
         )
         self.total = len(test_results)
+        # Add warnings as a separate count
+        self.counter["warnings"] = warnings_count
 
-    def count(self, outcome):
-        """Return the count for a given outcome (case-insensitive string)."""
-        return self.counter.get(str(outcome).lower(), 0)
+    def count(self, key: str) -> int:
+        """Return the count for a given outcome or event (case-insensitive string)."""
+        return self.counter.get(key.lower(), 0)
 
-    def as_dict(self):
-        """Return all outcome counts as a dict.
+    def as_dict(self) -> Dict[str, int]:
+        """Return all session-level event counts as a dict, with 'testoutcome.' prefix removed from keys."""
+        return {k[len("testoutcome.") :] if k.startswith("testoutcome.") else k: v for k, v in self.counter.items()}
 
-        Returns:
-            dict: Dictionary of outcome counts.
-
-        """
-        return dict(self.counter)
-
-    def __str__(self):
-        """Return a string representation of the TestSessionStats object.
-
-        Returns:
-            str: String representation of the TestSessionStats object.
-
-        """
+    def __str__(self) -> str:
+        """Return a string representation of the TestSessionStats object."""
         return f"TestSessionStats(total={self.total}, {dict(self.counter)})"
 
 
@@ -323,8 +318,8 @@ class TestSession:
         testing_system: dict = None,
         test_results: list = None,
         rerun_test_groups: list = None,
-        warnings: Optional[List[Dict[str, Any]]] = None,
-        errors: Optional[List[Dict[str, Any]]] = None,
+        warnings: Optional[List["RecapEvent"]] = None,
+        errors: Optional[List["RecapEvent"]] = None,
         session_stats: TestSessionStats = None,
     ):
         self.session_id = session_id
@@ -344,7 +339,6 @@ class TestSession:
 
         Returns:
             dict: Dictionary representation of the test session.
-
         """
         return {
             "session_id": self.session_id,
@@ -358,8 +352,8 @@ class TestSession:
                 {"nodeid": group.nodeid, "tests": [t.to_dict() for t in group.tests]}
                 for group in self.rerun_test_groups
             ],
-            "warnings": self.warnings,
-            "errors": self.errors,
+            "warnings": [w.to_dict() for w in self.warnings],
+            "errors": [e.to_dict() for e in self.errors],
             "session_stats": self.session_stats.as_dict() if self.session_stats else {},
         }
 
@@ -396,7 +390,6 @@ class TestSession:
 
         Raises:
             ValueError: If result is not a TestResult instance.
-
         """
         if not isinstance(result, TestResult):
             raise ValueError(
@@ -413,7 +406,6 @@ class TestSession:
 
         Raises:
             ValueError: If group is not a RerunTestGroup instance.
-
         """
         if not isinstance(group, RerunTestGroup):
             raise ValueError(
@@ -421,3 +413,27 @@ class TestSession:
             )
 
         self.rerun_test_groups.append(group)
+
+
+@dataclass
+class RecapEvent:
+    nodeid: Optional[str] = None
+    when: Optional[str] = None
+    outcome: Optional[str] = None
+    message: Optional[str] = None
+    category: Optional[str] = None
+    filename: Optional[str] = None
+    lineno: Optional[int] = None
+    longrepr: Optional[Any] = None
+    sections: List[Any] = field(default_factory=list)
+    keywords: List[str] = field(default_factory=list)
+    location: Optional[Any] = None
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    def is_warning(self) -> bool:
+        return self.category is not None and self.message is not None
+
+    def is_error(self) -> bool:
+        return self.outcome == "failed" and self.longrepr is not None
