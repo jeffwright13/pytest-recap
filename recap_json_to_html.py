@@ -164,8 +164,8 @@ def main(json_path, html_path):
     .test-title-cell:hover {{ background: #f0f7ff; }}
     .col-outcome, .col-duration {{ width: 6em; min-width: 4em; }}
 
-    .details-row td {{ max-width: 800px; word-break: break-word; }}
-    .details-row pre {{ white-space: pre-wrap; word-break: break-word; max-width: 800px; overflow-x: auto; }}
+    .details-row td {{ max-width: none; word-break: break-word; }}
+    .details-row pre {{ white-space: pre-wrap; word-break: break-word; max-width: none; overflow-x: auto; }}
     tr.passed {{ background: #e8f5e9; }}
     tr.failed {{ background: #ffebee; }}
     tr.skipped {{ background: #fff8e1; }}
