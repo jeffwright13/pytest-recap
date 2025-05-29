@@ -463,12 +463,14 @@ def write_recap_file(session: TestSession, destination: str, terminalreporter: T
                     os.makedirs(parent_dir, exist_ok=True)
         else:
             base_dir = os.environ.get("SESSION_WRITE_BASE_DIR", os.path.expanduser("~/.pytest_recap_sessions"))
+            base_dir = os.path.abspath(base_dir)
             date_dir = os.path.join(base_dir, now.strftime("%Y/%m"))
             os.makedirs(date_dir, exist_ok=True)
             filename = (
                 f"{now.strftime('%Y%m%d-%H%M%S')}_{getattr(session, 'system_under_test', {}).get('name', 'sut')}.json"
             )
             filepath = os.path.join(date_dir, filename)
+            filepath = os.path.abspath(filepath)
         try:
             storage = JSONStorage(filepath)
             # Pass indent to storage for pretty/minified output
@@ -481,5 +483,13 @@ def write_recap_file(session: TestSession, destination: str, terminalreporter: T
     terminalreporter.write_sep("=", "pytest-recap")
     BLUE = "\033[34m"
     RESET = "\033[0m"
-    blue_path = f"Recap JSON written to: {BLUE}{filepath}{RESET}"
+
+    # Print cloud URI directly if applicable, else absolute file path
+    def is_cloud_uri(uri):
+        return isinstance(uri, str) and (
+            uri.startswith("s3://") or uri.startswith("gs://") or uri.startswith("azure://")
+        )
+
+    recap_uri = filepath if is_cloud_uri(filepath) else os.path.abspath(filepath)
+    blue_path = f"Recap JSON written to: {BLUE}{recap_uri}{RESET}"
     terminalreporter.write_line(blue_path)
