@@ -3,6 +3,28 @@
 ## [Unreleased]
 
 ### Added
+- New HTML report generator (`recap_json_to_html.py`) for pytest-recap sessions.
+  - Generates a modern, interactive HTML report from `recap.json`.
+  - Features include:
+    - Summary stats and pie chart of outcomes
+    - Expandable/collapsible test details
+    - Sortable and filterable results table
+    - Session metadata section (collapsible)
+    - Outcome filtering and master toggle
+    - User-friendly, responsive design
+- Documentation and usage instructions for the HTML report in README.
+
+### Changed
+- Recap JSON format now uses timezone-aware UTC timestamps for all session/test times.
+- `TestSessionStats` constructor and usages now require `warnings_count` (plural) for consistency.
+- `RecapEvent` API provides `.is_warning()` and `.is_error()` helpers for event type checks.
+- All logger calls use `logger.warning` (not `logger.warnings`).
+- Updated recap.json sample and documentation to match new format.
+- Improved test coverage and restored/fixed test suite (including demo suite failures and expected errors).
+- Codebase uses `ruff` and `ruff format` for linting/formatting; pre-commit hooks recommended.
+
+
+### Added
 - New `--recap-pretty` CLI flag, `RECAP_PRETTY` environment variable, and `recap_pretty` ini option for controlling recap JSON output format (pretty-printed or minified). Default is minified. Precedence: CLI > ENV > INI > default.
 - Tests for pretty/minified output at both plugin and storage layers.
 
