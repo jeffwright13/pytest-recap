@@ -505,3 +505,90 @@ def test_testsession_add_rerun_group_invalid():
     )
     with pytest.raises(ValueError):
         session.add_rerun_group("not_a_rerun_group")
+
+
+def test_sessionstats_warnings_consistency():
+    from pytest_recap.models import TestResult, TestSessionStats
+
+    test_results = [TestResult(nodeid="t1", outcome="passed")]
+    stats = TestSessionStats(test_results, warnings_count=2)
+    assert stats.count("warnings") == 2
+    assert stats.as_dict()["warnings"] == 2
+
+
+def test_session_serialization_and_deserialization_with_warnings():
+    from datetime import datetime, timezone
+
+    from pytest_recap.models import RecapEvent, RecapEventType, TestResult, TestSession
+
+    now = datetime.now(timezone.utc)
+    test_results = [TestResult(nodeid="t1", outcome="passed", start_time=now, stop_time=now, duration=0.0)]
+    warnings = [
+        RecapEvent(message="foo", event_type=RecapEventType.WARNING),
+        RecapEvent(message="bar", event_type=RecapEventType.WARNING),
+    ]
+    session = TestSession(
+        session_id="abc",
+        session_start_time=now,
+        session_stop_time=now,
+        test_results=test_results,
+        warnings=warnings,
+        system_under_test={},
+        testing_system={},
+        session_tags={},
+        rerun_test_groups=[],
+        errors=[],
+    )
+    data = session.to_dict()
+    assert data["session_stats"]["warnings"] == 2
+    session2 = TestSession.from_dict(data)
+    assert session2.session_stats.count("warnings") == 2
+    assert len(session2.warnings) == 2
+    # Check roundtrip event_type
+    for w in session2.warnings:
+        assert w.event_type == RecapEventType.WARNING
+
+
+def test_recapevent_event_type_and_methods():
+    from pytest_recap.models import RecapEvent, RecapEventType
+
+    # Default is WARNING
+    ev = RecapEvent(message="foo")
+    assert ev.event_type == RecapEventType.WARNING
+    assert ev.is_warning() is True
+    assert ev.is_error() is False
+    # Explicit ERROR
+    err = RecapEvent(message="fail", event_type=RecapEventType.ERROR)
+    assert err.event_type == RecapEventType.ERROR
+    assert err.is_warning() is False
+    assert err.is_error() is True
+    # Serialization/deserialization
+    d = err.to_dict()
+    assert d["event_type"] == RecapEventType.ERROR
+    ev2 = RecapEvent(**d)
+    assert ev2.event_type == RecapEventType.ERROR
+    assert ev2.is_error() is True
+
+
+def test_deserialization_handles_missing_warnings():
+    from datetime import datetime, timezone
+
+    from pytest_recap.models import TestSession
+
+    now = datetime.now(timezone.utc)
+    data = {
+        "session_id": "abc",
+        "session_start_time": now.isoformat(),
+        "session_stop_time": now.isoformat(),
+        "test_results": [],
+        # No 'warnings' key
+        "system_under_test": {},
+        "testing_system": {},
+        "session_tags": {},
+        "rerun_test_groups": [],
+        "errors": [],
+        "session_stats": {"warnings": 0},
+    }
+    session = TestSession.from_dict(data)
+    assert session.session_stats.count("warnings") == 0
+    assert session.warnings == []

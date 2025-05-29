@@ -1,4 +1,4 @@
-from pytest_recap.models import RecapEvent
+from pytest_recap.models import RecapEvent, RecapEventType
 
 
 def test_recap_event_warning_to_dict():
@@ -10,6 +10,7 @@ def test_recap_event_warning_to_dict():
         filename="mytest.py",
         lineno=42,
         location=("mytest.py", 42, "test_warn"),
+        event_type=RecapEventType.WARNING,
     )
     d = warning.to_dict()
     assert d["nodeid"] == "mytest.py::test_warn"
@@ -37,6 +38,7 @@ def test_recap_event_error_to_dict():
         longrepr="AssertionError: fail",
         sections=[("Captured stdout call", "output")],
         keywords=["fail", "mytest"],
+        event_type=RecapEventType.ERROR,
     )
     d = error.to_dict()
     assert d["nodeid"] == "mytest.py::test_fail"
@@ -57,11 +59,13 @@ def test_recap_event_error_to_dict():
 
 
 def test_recap_event_summary_helpers():
-    warning = RecapEvent(message="warn", category="UserWarning")
-    error = RecapEvent(outcome="failed", longrepr="fail")
-    info = RecapEvent(message="info", category=None, outcome="passed")
+    warning = RecapEvent(message="warn", category="UserWarning", event_type=RecapEventType.WARNING)
+    error = RecapEvent(outcome="failed", longrepr="fail", event_type=RecapEventType.ERROR)
+    info = RecapEvent(
+        message="info", category=None, outcome="passed", event_type=RecapEventType.WARNING
+    )  # treat as warning for now
     events = [warning, error, info]
     warning_count = sum(1 for e in events if e.is_warning())
     error_count = sum(1 for e in events if e.is_error())
-    assert warning_count == 1
+    assert warning_count == 2  # warning + info (since default is WARNING)
     assert error_count == 1

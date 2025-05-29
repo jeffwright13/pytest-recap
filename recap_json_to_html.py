@@ -13,6 +13,7 @@ an HTML report summarizing the test session and results.
 
 import datetime
 import json
+import json as _json
 import sys
 from pathlib import Path
 
@@ -94,7 +95,37 @@ def main(json_path, html_path):
         chart_data.append(count)
         chart_colors.append(outcome_color_map.get(outcome, "#BDBDBD"))
 
-    import json as _json
+    # --- Warnings and Errors sections ---
+    warnings = []
+    errors = []
+    # Collect events from 'warnings' and 'errors' arrays if present
+    for event in data.get("warnings", []):
+        if event.get("event_type", "warning") == "warning":
+            warnings.append(event)
+        elif event.get("event_type") == "error":
+            errors.append(event)
+    for event in data.get("errors", []):
+        if event.get("event_type", "error"):
+            errors.append(event)
+        elif event.get("event_type") == "warning":
+            warnings.append(event)
+
+    def render_event_table(events, title):
+        if not events:
+            return f"<p>No {title.lower()}s.</p>"
+        cols = ["nodeid", "when", "message", "category", "filename", "lineno", "outcome", "longrepr"]
+        header = "".join(f"<th>{col.title()}</th>" for col in cols)
+        rows = ""
+        for ev in events:
+            rows += "<tr>" + "".join(f"<td>{ev.get(col, '')}</td>" for col in cols) + "</tr>\n"
+        return f"""
+<table>
+  <thead><tr>{header}</tr></thead>
+  <tbody>
+    {rows}
+  </tbody>
+</table>
+"""
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -164,6 +195,15 @@ def main(json_path, html_path):
       <li><strong>Pytest:</strong> {testing_system.get("pytest_version", "")}</li>
       <li><strong>Environment:</strong> {testing_system.get("environment", "")}</li>
     </ul>
+  </details>
+
+  <details>
+    <summary><strong>Warnings ({len(warnings)})</strong></summary>
+    {render_event_table(warnings, "Warning")}
+  </details>
+  <details>
+    <summary><strong>Errors ({len(errors)})</strong></summary>
+    {render_event_table(errors, "Error")}
   </details>
 
   <h2>Test Results</h2>

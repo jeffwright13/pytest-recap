@@ -1,13 +1,3 @@
-"""Models for test session data.
-
-Core models:
-1. TestOutcome - Enum for test result outcomes
-2. TestSessionStats - Aggregates test outcome statistics for a single session
-3. TestResult - Single test execution result
-4. TestSession - Collection of test results with metadata
-5. RerunTestGroup - Group of related test reruns
-"""
-
 import logging
 from collections import Counter
 from dataclasses import asdict, dataclass, field
@@ -258,7 +248,18 @@ class RerunTestGroup:
 
 
 class TestSessionStats:
-    """Aggregates session-level statistics, including test outcomes and other events (e.g., warnings)."""
+    """Aggregates session-level statistics, including test outcomes and other events (e.g., warnings).
+
+    Attributes:
+        passed (int): Number of passed tests
+        failed (int): Number of failed tests
+        skipped (int): Number of skipped tests
+        xfailed (int): Number of unexpectedly failed tests
+        xpassed (int): Number of unexpectedly passed tests
+        error (int): Number of error tests
+        rerun (int): Number of rerun tests
+        warnings (int): Number of warnings encountered in this session
+    """
 
     __test__ = False  # Tell Pytest this is NOT a test class
 
@@ -332,7 +333,7 @@ class TestSession:
         self.rerun_test_groups = rerun_test_groups or []
         self.warnings = warnings or []
         self.errors = errors or []
-        self.session_stats = session_stats or TestSessionStats(self.test_results)
+        self.session_stats = session_stats or TestSessionStats(self.test_results, len(self.warnings))
 
     def to_dict(self) -> Dict:
         """Convert TestSession to a dictionary for JSON serialization.
@@ -359,7 +360,7 @@ class TestSession:
 
     @classmethod
     def from_dict(cls, d):
-        """Create a TestSession from a dictionary."""
+        """Create a TestSession from a dictionary. Ensures warnings count is passed to TestSessionStats."""
         if not isinstance(d, dict):
             raise ValueError(f"Invalid data for TestSession. Expected dict, got {type(d)}")
         session_start_time = d.get("session_start_time")
@@ -368,8 +369,9 @@ class TestSession:
         session_stop_time = d.get("session_stop_time")
         if isinstance(session_stop_time, str):
             session_stop_time = datetime.fromisoformat(session_stop_time)
-        test_results = [TestResult.from_dict(tr) for tr in d.get("test_results", [])]
-        session_stats = TestSessionStats(test_results)
+        test_results = [TestResult.from_dict(test_result) for test_result in d.get("test_results", [])]
+        warnings = [RecapEvent(**w) if not isinstance(w, RecapEvent) else w for w in d.get("warnings", [])]
+        session_stats = TestSessionStats(test_results, warnings_count=len(warnings))
         return cls(
             session_id=d.get("session_id"),
             session_start_time=session_start_time,
@@ -379,6 +381,8 @@ class TestSession:
             testing_system=d.get("testing_system", {}),
             test_results=test_results,
             rerun_test_groups=[RerunTestGroup.from_dict(g) for g in d.get("rerun_test_groups", [])],
+            warnings=warnings,
+            errors=d.get("errors", []),
             session_stats=session_stats,
         )
 
@@ -415,8 +419,14 @@ class TestSession:
         self.rerun_test_groups.append(group)
 
 
+class RecapEventType(str, Enum):
+    ERROR = "error"
+    WARNING = "warning"
+
+
 @dataclass
 class RecapEvent:
+    event_type: RecapEventType = RecapEventType.WARNING
     nodeid: Optional[str] = None
     when: Optional[str] = None
     outcome: Optional[str] = None
@@ -430,10 +440,13 @@ class RecapEvent:
     location: Optional[Any] = None
 
     def to_dict(self) -> dict:
+        """Convert the RecapEvent to a dictionary."""
         return asdict(self)
 
     def is_warning(self) -> bool:
-        return self.category is not None and self.message is not None
+        """Return True if this event is classified as a warning."""
+        return self.event_type == RecapEventType.WARNING
 
     def is_error(self) -> bool:
-        return self.outcome == "failed" and self.longrepr is not None
+        """Return True if this event is classified as an error."""
+        return self.event_type == RecapEventType.ERROR

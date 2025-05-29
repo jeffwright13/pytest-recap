@@ -399,7 +399,7 @@ def build_recap_session(
 
     # Session stats
     test_result_objs: List[TestResult] = [TestResult.from_dict(tr) for tr in test_results]
-    session_stats = TestSessionStats(test_result_objs)
+    session_stats = TestSessionStats(test_result_objs, warnings_count=len(warnings))
 
     # Build and return session
     session = TestSession(
