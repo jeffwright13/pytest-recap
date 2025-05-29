@@ -127,6 +127,28 @@ def main(json_path, html_path):
 </table>
 """
 
+    # --- Rerun Test Groups section ---
+    rerun_test_groups = data.get("rerun_test_groups", [])
+
+    def render_rerun_group_table(groups):
+        if not groups:
+            return "<p>No rerun test groups.</p>"
+        header = "<th>Group Id</th><th>Final Outcome</th><th>Num Reruns</th><th>Test Nodeids</th>"
+        rows = ""
+        for g in groups:
+            group_id = g.get("nodeid", "[unknown]")
+            tests = g.get("tests", [])
+            final_outcome = tests[-1].get("outcome") if tests else "[unknown]"
+            num_reruns = sum(1 for t in tests if t.get("outcome") == "rerun")
+            nodeids = sorted(set(t.get("nodeid", "") for t in tests))
+            rows += (
+                f"<tr><td>{group_id}</td>"
+                f"<td>{final_outcome}</td>"
+                f"<td>{num_reruns}</td>"
+                f"<td>{', '.join(nodeids)}</td></tr>\n"
+            )
+        return f"<table><thead><tr>{header}</tr></thead><tbody>{rows}</tbody></table>"
+
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -204,6 +226,11 @@ def main(json_path, html_path):
   <details>
     <summary><strong>Errors ({len(errors)})</strong></summary>
     {render_event_table(errors, "Error")}
+  </details>
+
+  <details>
+    <summary><strong>Rerun Test Groups ({len(rerun_test_groups)})</strong></summary>
+    {render_rerun_group_table(rerun_test_groups)}
   </details>
 
   <h2>Test Results</h2>
