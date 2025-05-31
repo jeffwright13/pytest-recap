@@ -20,15 +20,15 @@ from pathlib import Path
 
 def format_human_duration(seconds):
     seconds = int(round(seconds))
-    h, rem = divmod(seconds, 3600)
-    m, s = divmod(rem, 60)
+    h, h_rem = divmod(seconds, 3600)
+    m, s = divmod(h_rem, 60)
     parts = []
     if h:
         parts.append(f"{h}h")
     if m or h:
         parts.append(f"{m}m")
     parts.append(f"{s}s")
-    return "".join(parts)
+    return " ".join(parts) if parts else "0s"
 
 
 def main(json_path, html_path):
@@ -41,22 +41,23 @@ def main(json_path, html_path):
     with open(json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    session = data.get("session", {})
-    session_start = session.get("start") or data.get("session_start_time") or ""
-    session_stop = session.get("stop") or data.get("session_stop_time") or ""
-    # Calculate session duration (in seconds, 3 decimals)
+    data.get("session", {})
+    # Calculate session duration robustly
+    session_start = data.get("session_start_time")
+    session_stop = data.get("session_stop_time")
     session_duration = 0.0
-    human_duration = format_human_duration(session_duration)
-    try:
-        if session_start and session_stop:
-            fmt = "%Y-%m-%dT%H:%M:%S"
-            s_start = session_start.split(".")[0]
-            s_stop = session_stop.split(".")[0]
-            dt_start = datetime.datetime.strptime(s_start, fmt)
-            dt_stop = datetime.datetime.strptime(s_stop, fmt)
-            session_duration = (dt_stop - dt_start).total_seconds()
-    except Exception:
-        pass
+    human_duration = "0s"
+    if session_start and session_stop:
+        try:
+            start_dt = datetime.datetime.fromisoformat(session_start)
+            stop_dt = datetime.datetime.fromisoformat(session_stop)
+            session_duration = max((stop_dt - start_dt).total_seconds(), 0.0)
+            human_duration = format_human_duration(session_duration)
+        except Exception:
+            session_duration = 0.0
+            human_duration = "N/A"
+    else:
+        human_duration = "N/A"
 
     test_results = data.get("test_results", [])
     system_under_test = data.get("system_under_test", {})
@@ -64,8 +65,8 @@ def main(json_path, html_path):
 
     # --- Summary stats ---
     outcome_counts = {}
-    for tr in test_results:
-        outcome = tr.get("outcome", "unknown")
+    for test_result in test_results:
+        outcome = test_result.get("outcome", "unknown")
         outcome_counts[outcome] = outcome_counts.get(outcome, 0) + 1
     total = len(test_results)
     passed = outcome_counts.get("passed", 0)
@@ -139,8 +140,8 @@ def main(json_path, html_path):
             group_id = g.get("nodeid", "[unknown]")
             tests = g.get("tests", [])
             final_outcome = tests[-1].get("outcome") if tests else "[unknown]"
-            num_reruns = sum(1 for t in tests if t.get("outcome") == "rerun")
-            nodeids = sorted(set(t.get("nodeid", "") for t in tests))
+            num_reruns = sum(t.get("outcome") == "rerun" for t in tests)
+            nodeids = sorted({t.get("nodeid", "") for t in tests})
             rows += (
                 f"<tr><td>{group_id}</td>"
                 f"<td>{final_outcome}</td>"
@@ -166,14 +167,22 @@ def main(json_path, html_path):
 
     .details-row td {{ max-width: none; word-break: break-word; }}
     .details-row pre {{ white-space: pre-wrap; word-break: break-word; max-width: none; overflow-x: auto; }}
-    tr.passed {{ background: #e8f5e9; }}
-    tr.failed {{ background: #ffebee; }}
-    tr.skipped {{ background: #fff8e1; }}
-    tr.error {{ background: #f3e5f5; }}
-    tr.xfailed {{ background: #e3f2fd; }}
-    tr.xpassed {{ background: #e0f7fa; }}
-    tr.rerun {{ background: #eceff1; }}
-    tr.unknown {{ background: #f5f5f5; }}
+    # tr.passed  {{ background: #e6f0db; }}
+    # tr.failed  {{ background: #ffe5e7; }}
+    # tr.skipped {{ background: #ffeed9; }}
+    # tr.error   {{ background: #f3e5f5; }}
+    # tr.xfailed {{ background: #e3f2fb; }}
+    # tr.xpassed {{ background: #d8f5f7; }}
+    # tr.rerun   {{ background: #e3e8eb; }}
+    # tr.unknown {{ background: #f8f8f8; }}
+    tr.passed  {{}}
+    tr.failed  {{}}
+    tr.skipped {{}}
+    tr.error   {{}}
+    tr.xfailed {{}}
+    tr.xpassed {{}}
+    tr.rerun   {{}}
+    tr.unknown {{}}
     .outcome-dot {{ display:inline-block; width:12px; height:12px; border-radius:50%; margin-right:6px; }}
     .expand-btn {{ cursor: pointer; color: #1976d2; text-decoration: underline; }}
     .details-row {{ display: none; background: #f9f9f9; }}
@@ -187,7 +196,7 @@ def main(json_path, html_path):
     <div>
       <h2>Summary</h2>
       <div style="margin-bottom: 0.5em; font-size: 1.1em;">
-        {total} tests ran in {session_duration:.3f} seconds ({human_duration})
+        {total} tests ran in {session_duration} seconds ({human_duration})
       </div>
       <ul>
         <li><strong>Total:</strong> {total}</li>
@@ -209,7 +218,7 @@ def main(json_path, html_path):
     <ul>
       <li><strong>Session start:</strong> {session_start}</li>
       <li><strong>Session stop:</strong> {session_stop}</li>
-      <li><strong>Duration:</strong> {session_duration:.3f} seconds</li>
+      <li><strong>Duration:</strong> {session_duration} seconds</li>
       <li><strong>System Under Test:</strong> {system_under_test.get("name", "")}</li>
       <li><strong>Host:</strong> {testing_system.get("hostname", "")}</li>
       <li><strong>Platform:</strong> {testing_system.get("platform", "")}</li>
@@ -260,30 +269,30 @@ def main(json_path, html_path):
 """
 
     # Sort: failures first, then errors, then others
-    def sort_key(tr):
+    def sort_key(test_result):
         order = {"failed": 0, "error": 1, "xfailed": 2, "xpassed": 3, "rerun": 4, "skipped": 5, "passed": 6}
-        return order.get(tr.get("outcome", "unknown"), 99)
+        return order.get(test_result.get("outcome", "unknown"), 99)
 
     test_results_sorted = sorted(test_results, key=sort_key)
-    for idx, tr in enumerate(test_results_sorted):
-        outcome = tr.get("outcome", "unknown")
-        nodeid = tr.get("nodeid", "")
-        duration = tr.get("duration", "")
-        start_time = tr.get("start_time", "")
-        stop_time = tr.get("stop_time", "")
+    for idx, test_result in enumerate(test_results_sorted):
+        outcome = test_result.get("outcome", "unknown")
+        nodeid = test_result.get("nodeid", "")
+        duration = test_result.get("duration", "")
+        start_time = test_result.get("start_time", "")
+        stop_time = test_result.get("stop_time", "")
         # Format duration to 3 decimals
         try:
-            duration_fmt = f"{float(duration):.3f}"
+            duration_fmt = f"{float(duration)}"
         except Exception:
             duration_fmt = duration
         # Use full ISO timestamps for start/stop times
         start_time_fmt = start_time
         stop_time_fmt = stop_time
 
-        capstdout = tr.get("capstdout", "")
-        capstderr = tr.get("capstderr", "")
-        caplog = tr.get("caplog", "")
-        longreprtext = tr.get("longreprtext", "")
+        capstdout = test_result.get("capstdout", "")
+        capstderr = test_result.get("capstderr", "")
+        caplog = test_result.get("caplog", "")
+        longreprtext = test_result.get("longreprtext", "")
         row_id = f"details-{idx}"
         html += f'''    <tr class="{outcome}">
       <td class="test-title-cell" onclick="toggleDetails('{row_id}')">{nodeid}</td>
@@ -317,7 +326,7 @@ def main(json_path, html_path):
       },
       options: {
         plugins: {
-          legend: { position: 'bottom' }
+          legend: { position: 'right' }
         }
       }
     });

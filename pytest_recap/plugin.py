@@ -1,22 +1,29 @@
 import ast
 import json
+import logging
 import os
 import platform
 import socket
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Generator, List, Optional, Tuple
 from warnings import WarningMessage
 
 import pytest
 from _pytest.config import Config
 from _pytest.config.argparsing import Parser
+from _pytest.nodes import Item
 from _pytest.reports import TestReport
+from _pytest.runner import CallInfo
 from _pytest.terminal import TerminalReporter
 
 from pytest_recap.cloud import upload_to_cloud
 from pytest_recap.models import RecapEvent, RerunTestGroup, TestResult, TestSession, TestSessionStats
 from pytest_recap.storage import JSONStorage
+
+# --- Global warning collection. This is required because Pytest hook pytest-warning-recorded
+# does not pass the Config object, so it cannot be used to store warnings.
+_collected_warnings = []
 
 
 # --- pytest hooks --- #
@@ -92,15 +99,27 @@ def pytest_configure(config: Config) -> None:
     config._recap_pretty: bool = str(pretty).strip().lower() in {"1", "true", "yes", "y"}
 
 
-# --- Global warning collection. This is required because Pytest hook pytest-warning-recorded
-# does not pass the Config object, so it cannot be used to store warnings.
-_collected_warnings = []
-
-
 def pytest_sessionstart(session):
     """Reset collected warnings at the start of each test session."""
     global _collected_warnings
     _collected_warnings = []
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item: Item, call: CallInfo) -> Generator:
+    """Hook into pytest's test report generation to generate start and stop times, if not set already."""
+    outcome = yield
+
+    logger = logging.getLogger(__name__)
+
+    report: TestReport = outcome.get_result()
+    if report.when == "setup" and not hasattr(report, "start"):
+        logger.warning(f"Setting start time for {report.nodeid} since it was not set previously")
+        setattr(report, "start", datetime.now(timezone.utc).timestamp())
+
+    if report.when == "teardown" and not hasattr(report, "stop"):
+        logger.warning(f"Setting stop time for {report.nodeid} since it was not set previously")
+        setattr(report, "stop", datetime.now(timezone.utc).timestamp())
 
 
 def pytest_warning_recorded(warning_message: WarningMessage, when: str, nodeid: str, location: tuple):
@@ -164,8 +183,8 @@ def pytest_terminal_summary(terminalreporter: TerminalReporter, exitstatus: int,
         test_results, session_start, session_end, rerun_groups, errors, warnings, terminalreporter, config
     )
     # Print summary of warnings and errors using RecapEvent helpers
-    warning_count = sum(1 for w in warnings if w.is_warning())
-    error_count = sum(1 for e in errors if e.is_error())
+    warning_count = sum(bool(w.is_warning()) for w in warnings)
+    error_count = sum(bool(e.is_error()) for e in errors)
     terminalreporter.write_sep("-", f"Recap: {warning_count} warnings, {error_count} errors collected")
 
     # Optionally, print details
