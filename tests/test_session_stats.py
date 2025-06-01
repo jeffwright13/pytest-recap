@@ -14,6 +14,11 @@ class DummyTestResult:
         ([], 0, {"warnings": 0}),
         (["error", "error", "xfailed"], 1, {"error": 2, "xfailed": 1, "warnings": 1}),
     ],
+    ids=[
+        "multiple_outcomes",
+        "empty",
+        "errors_and_xfailed",
+    ],
 )
 def test_session_stats_counts(outcomes, warnings_count, expected_counts):
     results = [DummyTestResult(outcome) for outcome in outcomes]

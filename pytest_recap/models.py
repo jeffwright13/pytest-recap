@@ -186,65 +186,52 @@ class RerunTestGroup:
     Attributes:
         nodeid (str): Test node ID.
         tests (List[TestResult]): List of TestResult objects for each rerun.
-
     """
-
     __test__ = False
-
     nodeid: str
-    tests: List[TestResult] = field(default_factory=list)
+    tests: List["TestResult"] = field(default_factory=list)
+
+    @property
+    def final_outcome(self) -> Optional[str]:
+        """Compute the final outcome for the group based on test results.
+
+        Returns:
+            Optional[str]: The computed final outcome (e.g., "passed", "failed", "error"), or None if no tests.
+        """
+        if not self.tests:
+            return None
+
+        # Make sure only one test has an outcome that is not "rerun"
+        non_rerun_count = sum(
+            test.outcome.value.lower() != "rerun" for test in self.tests
+        )
+        assert non_rerun_count == 1, f"Expected at most one non-rerun test, got {non_rerun_count} instead"
+
+        # The final outcome is the outcome of the only test that is not a rerun
+        for test in self.tests:
+            if test.outcome.value.lower() != "rerun":
+                return test.outcome.value.lower()
+        return None
 
     def add_test(self, result: "TestResult"):
-        """Add a test result and maintain chronological order.
-
-        Args:
-            result (TestResult): TestResult to add.
-
-        """
+        """Add a test result and maintain chronological order."""
         self.tests.append(result)
         self.tests.sort(key=lambda t: t.start_time)
 
-    @property
-    def final_outcome(self):
-        """Get the outcome of the final test (non-RERUN and non-ERROR).
-
-        Returns:
-            Optional[TestOutcome]: Final outcome if available.
-
-        """
-        outcomes = [t.outcome for t in self.tests]
-        if TestOutcome.FAILED in outcomes:
-            return TestOutcome.FAILED
-        return outcomes[-1] if outcomes else None
-
     def to_dict(self) -> Dict:
-        """Convert to dictionary for JSON serialization.
-
-        Returns:
-            dict: Dictionary representation of the rerun group.
-
-        """
-        return {"nodeid": self.nodeid, "tests": [t.to_dict() for t in self.tests]}
+        d = {"nodeid": self.nodeid, "tests": [t.to_dict() for t in self.tests]}
+        return d
 
     @classmethod
     def from_dict(cls, data: Dict) -> "RerunTestGroup":
-        """Create RerunTestGroup from dictionary.
-
-        Args:
-            data (Dict): Dictionary representation of the rerun group.
-
-        Returns:
-            RerunTestGroup: Instantiated RerunTestGroup object.
-
-        """
         if not isinstance(data, dict):
             raise ValueError(f"Invalid data for RerunTestGroup. Expected dict, got {type(data)}")
-
-        group = cls(nodeid=data["nodeid"])
-
-        tests = [TestResult.from_dict(test_dict) for test_dict in data.get("tests", [])]
-        group.tests = tests
+        group = cls(
+            nodeid=data["nodeid"],
+            tests=[TestResult.from_dict(test_dict) for test_dict in data.get("tests", [])],
+        )
         return group
+
 
 
 class TestSessionStats:

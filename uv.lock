@@ -747,11 +747,12 @@ wheels = [
 
 [[package]]
 name = "pytest-recap"
-version = "0.8.0"
+version = "0.9.1"
 source = { editable = "." }
 dependencies = [
     { name = "filelock" },
     { name = "pytest" },
+    { name = "pytest-cov" },
     { name = "pytest-rerunfailures" },
     { name = "requests" },
 ]
@@ -786,8 +787,9 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "filelock", specifier = ">=3.18.0" },
-    { name = "pytest", specifier = ">=8.3.5" },
-    { name = "pytest-rerunfailures", specifier = ">=15.0" },
+    { name = "pytest", specifier = ">=6.2.0" },
+    { name = "pytest-cov", specifier = ">=6.1.1" },
+    { name = "pytest-rerunfailures", specifier = ">=10.0" },
     { name = "requests", specifier = ">=2.32.3" },
 ]
 
@@ -801,7 +803,7 @@ all = [
     { name = "pytest", specifier = ">=8.3.5" },
     { name = "pytest-cov", specifier = ">=6.1.1" },
     { name = "pytest-mock", specifier = ">=3.14.0" },
-    { name = "pytest-rerunfailures", specifier = ">=15.0" },
+    { name = "pytest-rerunfailures", specifier = ">=10.0" },
     { name = "requests", specifier = ">=2.32.3" },
     { name = "ruff", specifier = ">=0.11.8" },
     { name = "tox", specifier = ">=4.25.0" },

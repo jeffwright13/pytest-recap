@@ -1,6 +1,6 @@
 [project]
 name = "pytest-recap"
-version = "0.9.0"
+version = "0.9.1"
 description = "Capture your test sessions. Recap the results."
 readme = "README.md"
 authors = [
@@ -12,6 +12,7 @@ dependencies = [
     "pytest-rerunfailures>=10.0",
     "pytest>=6.2.0",
     "requests>=2.32.3",
+    "pytest-cov>=6.1.1",
 ]
 
 [build-system]

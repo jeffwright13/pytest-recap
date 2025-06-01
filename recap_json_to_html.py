@@ -16,6 +16,7 @@ import json
 import json as _json
 import sys
 from pathlib import Path
+from pytest_recap.models import RerunTestGroup
 
 
 def format_human_duration(seconds):
@@ -30,23 +31,50 @@ def format_human_duration(seconds):
     parts.append(f"{s}s")
     return " ".join(parts) if parts else "0s"
 
+def render_rerun_group_table(groups: list[RerunTestGroup]) -> str:
+    """Render a table of rerun test groups in HTML."""
+    if not groups:
+        return "<p>No rerun test groups.</p>"
+    header = "<th>Group Id</th><th>Final Outcome</th><th>Num Reruns</th><th>Test Nodeids</th>"
+    rows = ""
+    for group in groups:
+        try:
+            group_obj = RerunTestGroup.from_dict(group)
+            group_id = group_obj.nodeid
+            final_outcome = group_obj.final_outcome if group_obj.final_outcome is not None else "[unknown]"
+            if final_outcome == "rerun":
+                breakpoint()
+                print()
+            num_reruns = sum(test.outcome.value.lower() == "rerun" for test in group_obj.tests)
+            nodeids = sorted({test.nodeid for test in group_obj.tests})
+        except Exception:
+            group_id = group.get("nodeid", "[unknown]")
+            final_outcome = "[error]"
+            num_reruns = 0
+            nodeids = []
+        rows += (
+            f"<tr><td>{group_id}</td>"
+            f"<td>{final_outcome}</td>"
+            f"<td>{num_reruns}</td>"
+            f"<td>{', '.join(nodeids)}</td></tr>\n"
+        )
+    return f"<table><thead><tr>{header}</tr></thead><tbody>{rows}</tbody></table>"
 
-def main(json_path, html_path):
+def main(json_path: Path, html_path: Path):
     """Convert recap.json to an advanced HTML report with summary stats, chart, sortable and expandable table.
 
     Args:
-        json_path (str): Path to the recap.json file.
-        html_path (str): Path to output HTML file.
+        json_path (Path): Path to the recap.json file.
+        html_path (Path): Path to output HTML file.
     """
     with open(json_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
+        data: dict = json.load(f)
 
-    data.get("session", {})
-    # Calculate session duration robustly
-    session_start = data.get("session_start_time")
-    session_stop = data.get("session_stop_time")
-    session_duration = 0.0
-    human_duration = "0s"
+    session: dict = data.get("session", {})
+    session_start: str | None = session.get("session_start_time")
+    session_stop: str | None = session.get("session_stop_time")
+    session_duration: float = 0.0
+    human_duration: str = "0s"
     if session_start and session_stop:
         try:
             start_dt = datetime.datetime.fromisoformat(session_start)
@@ -59,12 +87,12 @@ def main(json_path, html_path):
     else:
         human_duration = "N/A"
 
-    test_results = data.get("test_results", [])
-    system_under_test = data.get("system_under_test", {})
-    testing_system = data.get("testing_system", {})
+    test_results: list[dict] = data.get("test_results", [])
+    system_under_test: dict = data.get("system_under_test", {})
+    testing_system: dict = data.get("testing_system", {})
 
     # --- Summary stats ---
-    outcome_counts = {}
+    outcome_counts: dict[str, int] = {}
     for test_result in test_results:
         outcome = test_result.get("outcome", "unknown")
         outcome_counts[outcome] = outcome_counts.get(outcome, 0) + 1
@@ -78,10 +106,10 @@ def main(json_path, html_path):
     rerun = outcome_counts.get("rerun", 0)
 
     # --- Chart.js data ---
-    chart_labels = []
-    chart_data = []
-    chart_colors = []
-    outcome_color_map = {
+    chart_labels: list[str] = []
+    chart_data: list[int] = []
+    chart_colors: list[str] = []
+    outcome_color_map: dict[str, str] = {
         "passed": "#4CAF50",
         "failed": "#F44336",
         "skipped": "#FF9800",
@@ -97,8 +125,8 @@ def main(json_path, html_path):
         chart_colors.append(outcome_color_map.get(outcome, "#BDBDBD"))
 
     # --- Warnings and Errors sections ---
-    warnings = []
-    errors = []
+    warnings: list[dict] = []
+    errors: list[dict] = []
     # Collect events from 'warnings' and 'errors' arrays if present
     for event in data.get("warnings", []):
         if event.get("event_type", "warning") == "warning":
@@ -129,27 +157,7 @@ def main(json_path, html_path):
 """
 
     # --- Rerun Test Groups section ---
-    rerun_test_groups = data.get("rerun_test_groups", [])
-
-    def render_rerun_group_table(groups):
-        if not groups:
-            return "<p>No rerun test groups.</p>"
-        header = "<th>Group Id</th><th>Final Outcome</th><th>Num Reruns</th><th>Test Nodeids</th>"
-        rows = ""
-        for g in groups:
-            group_id = g.get("nodeid", "[unknown]")
-            tests = g.get("tests", [])
-            final_outcome = tests[-1].get("outcome") if tests else "[unknown]"
-            num_reruns = sum(t.get("outcome") == "rerun" for t in tests)
-            nodeids = sorted({t.get("nodeid", "") for t in tests})
-            rows += (
-                f"<tr><td>{group_id}</td>"
-                f"<td>{final_outcome}</td>"
-                f"<td>{num_reruns}</td>"
-                f"<td>{', '.join(nodeids)}</td></tr>\n"
-            )
-        return f"<table><thead><tr>{header}</tr></thead><tbody>{rows}</tbody></table>"
-
+    rerun_test_groups: list[dict] = data.get("rerun_test_groups", [])
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -280,36 +288,33 @@ def main(json_path, html_path):
         duration = test_result.get("duration", "")
         start_time = test_result.get("start_time", "")
         stop_time = test_result.get("stop_time", "")
-        # Format duration to 3 decimals
         try:
             duration_fmt = f"{float(duration)}"
         except Exception:
             duration_fmt = duration
-        # Use full ISO timestamps for start/stop times
-        start_time_fmt = start_time
-        stop_time_fmt = stop_time
 
         capstdout = test_result.get("capstdout", "")
         capstderr = test_result.get("capstderr", "")
         caplog = test_result.get("caplog", "")
         longreprtext = test_result.get("longreprtext", "")
         row_id = f"details-{idx}"
+
         html += f'''    <tr class="{outcome}">
-      <td class="test-title-cell" onclick="toggleDetails('{row_id}')">{nodeid}</td>
-      <td class="col-outcome"><span class="outcome-dot" style="background:{outcome_color_map.get(outcome, "#BDBDBD")}"></span>{outcome}</td>
-      <td class="col-duration">{duration_fmt}</td>
-      <td>{start_time_fmt}</td>
-      <td>{stop_time_fmt}</td>
-    </tr>\n'''
-        # Details row (hidden by default)
+          <td class="test-title-cell" onclick="toggleDetails('{row_id}')">{nodeid}</td>
+          <td class="col-outcome"><span class="outcome-dot" style="background:{outcome_color_map.get(outcome, "#BDBDBD")}"></span>{outcome}</td>
+          <td class="col-duration">{duration_fmt}</td>
+          <td>{start_time}</td>
+          <td>{stop_time}</td>
+        </tr>\n'''
+
         html += f'''    <tr id="{row_id}" class="details-row">
-      <td colspan="5">
-        <strong>Captured stdout:</strong><pre>{capstdout or "(none)"}</pre>
-        <strong>Captured stderr:</strong><pre>{capstderr or "(none)"}</pre>
-        <strong>Captured log:</strong><pre>{caplog or "(none)"}</pre>
-        <strong>Error/Traceback:</strong><pre>{longreprtext or "(none)"}</pre>
-      </td>
-    </tr>\n'''
+          <td colspan="5">
+            <strong>Captured stdout:</strong><pre>{capstdout or "(none)"}</pre>
+            <strong>Captured stderr:</strong><pre>{capstderr or "(none)"}</pre>
+            <strong>Captured log:</strong><pre>{caplog or "(none)"}</pre>
+            <strong>Error/Traceback:</strong><pre>{longreprtext or "(none)"}</pre>
+          </td>
+        </tr>\n'''
     html += """    </tbody>
   </table>
   <script>
@@ -419,4 +424,4 @@ if __name__ == "__main__":
     if len(sys.argv) != 3:
         print("Usage: python recap_json_to_html.py <recap.json> <report.html>")
         sys.exit(1)
-    main(sys.argv[1], sys.argv[2])
+    main(Path(sys.argv[1]), Path(sys.argv[2]))

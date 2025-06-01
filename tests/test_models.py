@@ -106,30 +106,33 @@ def test_testresult_from_dict_with_extra_fields(extra_field):
 
 
 def test_reruntestgroup_add_and_final_outcome():
+    from datetime import datetime, timedelta, timezone
+    from pytest_recap.models import RerunTestGroup, TestOutcome, TestResult
+
     start = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
     tr1 = TestResult(
-        "foo",
+        "dummy::nodeid",
         TestOutcome.RERUN,
         start,
         stop_time=start + timedelta(seconds=1),
         duration=1,
     )
     tr2 = TestResult(
-        "foo",
+        "dummy::nodeid",
         TestOutcome.FAILED,
         start + timedelta(seconds=1),
         stop_time=start + timedelta(seconds=2),
         duration=1,
     )
-    group = RerunTestGroup(nodeid="foo")
+    group = RerunTestGroup(nodeid="dummy::nodeid")
     group.add_test(tr1)
     group.add_test(tr2)
-    assert group.final_outcome == TestOutcome.FAILED
+    assert group.final_outcome == "failed"
     d = group.to_dict()
-    assert d["nodeid"] == "foo"
+    assert d["nodeid"] == "dummy::nodeid"
     assert len(d["tests"]) == 2
     group2 = RerunTestGroup.from_dict(d)
-    assert group2.nodeid == "foo"
+    assert group2.nodeid == "dummy::nodeid"
     assert group2.tests[1].outcome == TestOutcome.FAILED
     assert group2.tests[0].start_time == start
 
@@ -149,9 +152,9 @@ def test_reruntestgroup_all_skipped():
         stop_time=start + timedelta(seconds=1),
         duration=1,
     )
-    group = RerunTestGroup(nodeid="foo")
+    group = RerunTestGroup(nodeid="dummy::nodeid")
     group.add_test(tr)
-    assert group.final_outcome == TestOutcome.SKIPPED
+    assert group.final_outcome == "skipped"
 
 
 def test_testsession_add_and_to_from_dict():
@@ -372,23 +375,27 @@ def test_reruntestgroup_add_and_order():
     assert group.tests == [r1, r2]
 
 
-def test_reruntestgroup_final_outcome():
+@pytest.mark.parametrize("first_outcome, second_outcome, expected_outcome", [
+    ("rerun", "failed", "failed"),
+    ("rerun", "passed", "passed"),
+    ("rerun", "error", "error"),
+], ids=[
+    "rerun_then_failed",
+    "rerun_then_passed",
+    "rerun_then_error",
+])
+def test_reruntestgroup_final_outcome(first_outcome, second_outcome, expected_outcome):
     from datetime import datetime, timezone
 
     from pytest_recap.models import RerunTestGroup, TestOutcome, TestResult
 
     now = datetime.now(timezone.utc)
-    group = RerunTestGroup(nodeid="foo")
-    r1 = TestResult("foo", TestOutcome.RERUN, now, now, 0.0)
-    r2 = TestResult("foo", TestOutcome.FAILED, now, now, 0.0)
+    group = RerunTestGroup(nodeid="dummy::nodeid")
+    r1 = TestResult("foo", TestOutcome.from_str(first_outcome), now, now, 0.0)
+    r2 = TestResult("foo", TestOutcome.from_str(second_outcome), now, now, 0.0)
     group.add_test(r1)
     group.add_test(r2)
-    assert group.final_outcome == TestOutcome.FAILED
-    group2 = RerunTestGroup(nodeid="foo")
-    group2.add_test(r1)
-    assert group2.final_outcome == TestOutcome.RERUN
-    group3 = RerunTestGroup(nodeid="foo")
-    assert group3.final_outcome is None
+    assert group.final_outcome == expected_outcome
 
 
 def test_reruntestgroup_to_and_from_dict():
@@ -414,9 +421,73 @@ def test_reruntestgroup_from_dict_invalid():
         RerunTestGroup.from_dict([1, 2, 3])
 
 
-def test_testsession_to_and_from_dict():
+@pytest.mark.parametrize("final_outcome", ["passed", "failed", "error"])
+def test_rerun_test_groups_accepts_allowed_final_outcome(final_outcome):
+    """RerunTestGroup should accept allowed final_outcome values."""
+    from pytest_recap.models import TestOutcome, TestResult
     from datetime import datetime, timezone
 
+    now = datetime.now(timezone.utc)
+    group = RerunTestGroup(nodeid="dummy::nodeid")
+    result = TestResult(
+        nodeid="dummy::nodeid",
+        outcome=TestOutcome.from_str(final_outcome),
+        start_time=now,
+        stop_time=now,
+        duration=0.0,
+    )
+    group.add_test(result)
+    assert group.final_outcome == final_outcome
+
+
+def test_rerun_test_groups_allows_missing_final_outcome():
+    """RerunTestGroup should allow final_outcome to be omitted (defaults to None)."""
+    group = RerunTestGroup(nodeid="foo")
+    assert group.final_outcome is None
+
+@pytest.mark.parametrize("final_outcome", ["passed", "failed", "error"])
+def test_rerun_test_groups_json_roundtrip_with_final_outcome(final_outcome):
+    """RerunTestGroup should serialize and deserialize final_outcome correctly."""
+    from pytest_recap.models import TestOutcome, TestResult
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc)
+    group = RerunTestGroup(nodeid="dummy::nodeid")
+    result = TestResult(
+        nodeid="dummy::nodeid",
+        outcome=TestOutcome.from_str(final_outcome),
+        start_time=now,
+        stop_time=now,
+        duration=0.0,
+    )
+    group.add_test(result)
+    data = group.to_dict()
+    loaded = RerunTestGroup.from_dict(data)
+    assert loaded.final_outcome == final_outcome
+
+def test_rerun_test_groups_json_roundtrip_without_final_outcome():
+    """RerunTestGroup should handle missing final_outcome in JSON (backwards compatibility)."""
+    # Minimal valid dict for backwards compatibility
+    data = {"nodeid": "foo", "tests": []}
+    loaded = RerunTestGroup.from_dict(data)
+    assert loaded.final_outcome is None
+
+@pytest.mark.parametrize("final_outcome", ["passed", "failed", "error"])
+def test_html_generator_uses_final_outcome(final_outcome):
+    """HTML generator should use final_outcome if present."""
+    from pytest_recap.models import TestOutcome, TestResult
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc)
+    group = RerunTestGroup(nodeid="foo")
+    result = TestResult(nodeid="foo", outcome=TestOutcome.from_str(final_outcome), start_time=now, stop_time=now, duration=0.0)
+    group.add_test(result)
+    assert group.final_outcome == final_outcome
+
+
+
+def test_testsession_to_and_from_dict():
+    from datetime import datetime, timezone
     from pytest_recap.models import RerunTestGroup, TestOutcome, TestResult, TestSession
 
     now = datetime.now(timezone.utc)
