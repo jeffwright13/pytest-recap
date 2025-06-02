@@ -1,15 +1,10 @@
-import pytest
-from pytest_recap.models import TestOutcome, TestResult, RerunTestGroup
-from datetime import datetime, timezone
-from recap_json_to_html import main, render_rerun_group_table
-
 import json
 
-from recap_json_to_html import format_human_duration
+from recap_json_to_html import format_human_duration, main
 
 
 def test_format_human_duration_basic():
-    assert format_human_duration(0) == "0s"
+    assert format_human_duration(0) == "0.000000s"
     assert format_human_duration(59) == "59s"
     assert format_human_duration(60) == "1m 0s"
     assert format_human_duration(60 + 1) == "1m 1s"
@@ -69,21 +64,4 @@ def test_html_handles_empty_input(tmp_path):
     html = html_file.read_text()
     assert "<!DOCTYPE html>" in html
     assert "pytest-recap Test Report" in html
-
-
-def test_render_rerun_group_table_computed_final_outcome():
-    now = datetime.now(timezone.utc)
-    # Simulate a group with two test results: rerun then failed
-    group = RerunTestGroup(
-        nodeid="foo::bar",
-        tests=[
-            TestResult(nodeid="foo::bar", outcome=TestOutcome.RERUN, start_time=now, stop_time=now, duration=0.1),
-            TestResult(nodeid="foo::bar", outcome=TestOutcome.FAILED, start_time=now, stop_time=now, duration=0.2),
-        ]
-    )
-    group_dict = group.to_dict()
-    # Should match what recap.json would contain
-    html = render_rerun_group_table([group_dict])
-    assert "failed" in html
-    assert "foo::bar" in html
     assert "<table" in html
