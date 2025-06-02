@@ -15,6 +15,13 @@
 - Documentation and usage instructions for the HTML report in README.
 
 ### Changed
+- Improved duration formatting in HTML reports: durations <10s now display with 6 decimal places (e.g., `0.123456s`), while longer durations are shown in human-friendly formats (`1m 2s`, `2h 3m 4s`).
+- Session metadata extraction is now robust to both root-level and nested JSON structures; session duration and human-readable duration are always computed and displayed.
+- Warnings and errors are deduplicated by `(nodeid, message)` to reduce noise in reports.
+- Test results table now always sorts by outcome and start time for consistency.
+- Outcome percentages are now computed and displayed in the report summary.
+- Added a `main(json_path, html_path)` entrypoint to `recap_json_to_html.py` for easier CLI and test integration.
+- Improved test suite: updated duration tests, removed legacy/broken test for rerun group rendering, and fixed imports and assertions for robustness.
 - Recap JSON format now uses timezone-aware UTC timestamps for all session/test times.
 - `TestSessionStats` constructor and usages now require `warnings_count` (plural) for consistency.
 - `RecapEvent` API provides `.is_warning()` and `.is_error()` helpers for event type checks.

@@ -337,6 +337,12 @@ For cloud storage support in tests:
 
 ### Generating an Interactive HTML Report
 
+- Durations in the HTML report are now displayed with 6 decimal places for values under 10 seconds, and as human-friendly strings (e.g., `1m 2s`, `2h 3m 4s`) for longer durations.
+- Session metadata (start/stop time, duration) is always shown if available, and robustly extracted from recap JSON.
+- Warnings and errors are deduplicated to avoid repeated messages.
+- The report summary includes outcome percentages for each result type.
+
+
 After running your tests with pytest-recap, you can convert the `recap.json` file to a modern, interactive HTML report:
 
 ```bash
@@ -444,6 +450,10 @@ The structure of the recap JSON is governed by a [JSON Schema](schema/pytest-rec
 ---
 
 ## Development & Testing
+
+- The `recap_json_to_html.py` script now provides a `main(json_path, html_path)` function for programmatic and CLI use.
+- Tests have been improved for robustness and now match the new duration formatting and report structure.
+
 
 - Dev dependencies: `uv pip install -r requirements-dev.txt` or use `uv add --dev ...` as above.
 - Run all tests: `uv run pytest tests -v`
