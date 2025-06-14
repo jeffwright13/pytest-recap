@@ -42,10 +42,10 @@ All fields are documented in the plugin source and schema.
 
 ```json
 {
-  "session_id": "20250528-054714-c9089ccf",
+  "session_id": "20250604-024258-69f9b186",
   "session_tags": {},
-  "session_start_time": "2025-05-28T05:47:14.637005+00:00",
-  "session_stop_time": "2025-05-28T05:47:14.675832+00:00",
+  "session_start_time": "2025-06-04T02:42:58.827303+00:00",
+  "session_stop_time": "2025-06-04T02:43:00.314905+00:00",
   "system_under_test": {
     "name": "pytest-recap"
   },
@@ -53,237 +53,262 @@ All fields are documented in the plugin source and schema.
     "hostname": "GPYVQ4KGXY.local",
     "platform": "macOS-15.5-x86_64-i386-64bit",
     "python_version": "3.9.16",
-    "pytest_version": "8.3.5",
+    "pytest_version": "7.4.4",
     "environment": "test"
   },
   "test_results": [
     {
-      "nodeid": "demo-tests/orig/test_0.py::test0_1_pass_capturing",
+      "nodeid": "demo-tests/test_realistic_minimal.py::test_pass",
       "outcome": "passed",
-      "start_time": "2025-05-28T05:47:14.637005+00:00",
-      "stop_time": "2025-05-28T05:47:14.637661+00:00",
-      "duration": 0.000656,
-      "caplog": "\u001b[32mINFO    \u001b[0m conftest:test_0.py:18 \u200b\u200b\u200b\n\u001b[33mWARNING \u001b[0m conftest:test_0.py:21 FAIL this log is captured\n\u001b[33mWARNING \u001b[0m conftest:test_0.py:25 FAIL is this log captured?\n\u001b[33mWARNING \u001b[0m conftest:test_0.py:28 FAIL this log is also captured\n\u001b[32mINFO    \u001b[0m conftest:test_0.py:32 Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo;",
-      "capstderr": "FAIL this stderr is captured\nFAIL this stderr is also captured\n",
-      "capstdout": "FAIL this stdout is captured\nFAIL this stdout is also captured\n",
-      "longreprtext": "None"
-    },
-    {
-      "nodeid": "demo-tests/orig/test_0.py::test_with_warning",
-      "outcome": "passed",
-      "start_time": "2025-05-28T05:47:14.650280+00:00",
-      "stop_time": "2025-05-28T05:47:14.650409+00:00",
-      "duration": 0.000129,
+      "start_time": "2025-06-04T02:42:58.827303+00:00",
+      "stop_time": "2025-06-04T02:42:59.031785+00:00",
+      "duration": 0.204482,
       "caplog": "",
       "capstderr": "",
       "capstdout": "",
-      "longreprtext": "None"
+      "longreprtext": ""
     },
     {
-      "nodeid": "demo-tests/orig/test_0.py::test0_1_fail_capturing",
-      "outcome": "failed",
-      "start_time": "2025-05-28T05:47:14.638547+00:00",
-      "stop_time": "2025-05-28T05:47:14.639152+00:00",
-      "duration": 0.000605,
-      "caplog": "\u001b[32mINFO    \u001b[0m conftest:test_0.py:39 \u200b\u200b\u200b\n\u001b[33mWARNING \u001b[0m conftest:test_0.py:42 FAIL this log is captured\n\u001b[33mWARNING \u001b[0m conftest:test_0.py:46 FAIL is this log captured?\n\u001b[33mWARNING \u001b[0m conftest:test_0.py:49 FAIL this log is also captured\n\u001b[31mCRITICAL\u001b[0m conftest:test_0.py:50 Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum;\n\u001b[1m\u001b[31mERROR   \u001b[0m conftest:test_0.py:51 Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum;\n\u001b[32mINFO    \u001b[0m conftest:test_0.py:53 Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum;",
-      "capstderr": "FAIL this stderr is captured\nFAIL this stderr is also captured\n",
-      "capstdout": "FAIL this stdout is captured\nFAIL this stdout is also captured\n",
-      "longreprtext": "capsys = <_pytest.capture.CaptureFixture object at 0x10c3071c0>\nfake_data = 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, ...ariatur Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum;'\nlogger = <Logger conftest (DEBUG)>\n\n    def test0_1_fail_capturing(capsys, fake_data, logger):\n        logger.info(ZWS_X3)\n        print(\"FAIL this stdout is captured\")\n        print(\"FAIL this stderr is captured\", file=sys.stderr)\n        logger.warning(\"FAIL this log is captured\")\n        with capsys.disabled():\n            print(\"FAIL stdout not captured, going directly to sys.stdout\")\n            print(\"FAIL stderr not captured, going directly to sys.stderr\", file=sys.stderr)\n            logger.warning(\"FAIL is this log captured?\")\n        print(\"FAIL this stdout is also captured\")\n        print(\"FAIL this stderr is also captured\", file=sys.stderr)\n        logger.warning(\"FAIL this log is also captured\")\n        logger.critical(fake_data)\n        logger.error(fake_data)\n        # logger.warning(fake_data)\n        logger.info(fake_data)\n        # logger.debug(fake_data)\n        # logger.info(ZWJ_X3)\n>       assert False\nE       assert False\n\ndemo-tests/orig/test_0.py:56: AssertionError"
-    },
-    {
-      "nodeid": "demo-tests/orig/test_0.py::test_always_rerun",
-      "outcome": "failed",
-      "start_time": "2025-05-28T05:47:14.675488+00:00",
-      "stop_time": "2025-05-28T05:47:14.675832+00:00",
-      "duration": 0.000344,
+      "nodeid": "demo-tests/test_realistic_minimal.py::test_rerun",
+      "outcome": "passed",
+      "start_time": "2025-06-04T02:42:59.789393+00:00",
+      "stop_time": "2025-06-04T02:42:59.893555+00:00",
+      "duration": 0.104162,
       "caplog": "",
       "capstderr": "",
       "capstdout": "",
-      "longreprtext": "tmp_path = PosixPath('/private/var/folders/pd/fvjgwfx97wb95q5t2k168sxr0000gn/T/pytest-of-jwr003/pytest-118/test_always_rerun2')\n\n    @pytest.mark.flaky(reruns=2)\n    def test_always_rerun(tmp_path):\n        state_file = tmp_path / \"rerun_state.txt\"\n        if not state_file.exists():\n            state_file.write_text(\"fail\")\n>           assert False, \"Fail first run\"\nE           AssertionError: Fail first run\nE           assert False\n\ndemo-tests/orig/test_0.py:144: AssertionError"
+      "longreprtext": ""
     },
     {
-      "nodeid": "demo-tests/orig/test_0.py::test0_skip",
+      "nodeid": "demo-tests/test_realistic_minimal.py::test_warning",
+      "outcome": "passed",
+      "start_time": "2025-06-04T02:42:59.904049+00:00",
+      "stop_time": "2025-06-04T02:43:00.004588+00:00",
+      "duration": 0.100539,
+      "caplog": "",
+      "capstderr": "",
+      "capstdout": "",
+      "longreprtext": ""
+    },
+    {
+      "nodeid": "demo-tests/test_realistic_minimal.py::test_long_output",
+      "outcome": "passed",
+      "start_time": "2025-06-04T02:43:00.006397+00:00",
+      "stop_time": "2025-06-04T02:43:00.209279+00:00",
+      "duration": 0.202882,
+      "caplog": "\u001b[33mWARNING \u001b[0m demo:test_realistic_minimal.py:71 Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...Long output the second...",
+      "capstderr": "",
+      "capstdout": "",
+      "longreprtext": ""
+    },
+    {
+      "nodeid": "demo-tests/test_realistic_minimal.py::test_stdout_stderr",
+      "outcome": "passed",
+      "start_time": "2025-06-04T02:43:00.210150+00:00",
+      "stop_time": "2025-06-04T02:43:00.314905+00:00",
+      "duration": 0.104755,
+      "caplog": "",
+      "capstderr": "",
+      "capstdout": "",
+      "longreprtext": ""
+    },
+    {
+      "nodeid": "demo-tests/test_realistic_minimal.py::test_fail",
+      "outcome": "failed",
+      "start_time": "2025-06-04T02:42:59.035346+00:00",
+      "stop_time": "2025-06-04T02:42:59.340679+00:00",
+      "duration": 0.305333,
+      "caplog": "",
+      "capstderr": "",
+      "capstdout": "",
+      "longreprtext": "noisy_fixture = None\n\n    def test_fail(noisy_fixture):\n        print(\"failing stdout\")\n        logger.info(\"failing log\")\n        warnings.warn(\"failing warning\", UserWarning)\n        time.sleep(0.3)\n>       assert False, \"Intentional failure\"\nE       AssertionError: Intentional failure\nE       assert False\n\ndemo-tests/test_realistic_minimal.py:29: AssertionError"
+    },
+    {
+      "nodeid": "demo-tests/test_realistic_minimal.py::test_skip",
       "outcome": "skipped",
-      "start_time": "2025-05-28T05:47:14.650800+00:00",
-      "stop_time": "2025-05-28T05:47:14.650965+00:00",
-      "duration": 0.000165,
+      "start_time": "2025-06-04T02:42:59.358949+00:00",
+      "stop_time": "2025-06-04T02:42:59.359087+00:00",
+      "duration": 0.000138,
       "caplog": "",
       "capstderr": "",
       "capstdout": "",
-      "longreprtext": "('/Users/jwr003/coding/pytest-recap/demo-tests/orig/test_0.py', 74, 'Skipped: Skipping this test with decorator.')"
+      "longreprtext": "('/Users/jwr003/coding/pytest-recap/demo-tests/test_realistic_minimal.py', 31, 'Skipped: demonstrate skip')"
     },
     {
-      "nodeid": "demo-tests/orig/test_0.py::test0_xfail",
+      "nodeid": "demo-tests/test_realistic_minimal.py::test_xfail",
       "outcome": "xfailed",
-      "start_time": "2025-05-28T05:47:14.651410+00:00",
-      "stop_time": "2025-05-28T05:47:14.651561+00:00",
-      "duration": 0.000151,
+      "start_time": "2025-06-04T02:42:59.359766+00:00",
+      "stop_time": "2025-06-04T02:42:59.515335+00:00",
+      "duration": 0.155569,
       "caplog": "",
       "capstderr": "",
       "capstdout": "",
-      "longreprtext": "file /Users/jwr003/coding/pytest-recap/demo-tests/orig/test_0.py, line 82\n  @pytest.mark.xfail()\n  def test0_xfail(logger, capstderr):\nE       fixture 'capstderr' not found\n>       available fixtures: cache, capfd, capfdbinary, caplog, capsys, capsysbinary, class_mocker, cov, doctest_namespace, error_fixture, fake_data, include_metadata_in_junit_xml, json_metadata, logger, metadata, mocker, module_mocker, monkeypatch, no_cover, package_mocker, pytestconfig, random_sleep, record_property, record_testsuite_property, record_xml_attribute, recwarn, session_mocker, test_data, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory\n>       use 'pytest --fixtures [testpath]' for help on them.\n\n/Users/jwr003/coding/pytest-recap/demo-tests/orig/test_0.py:82"
+      "longreprtext": "@pytest.mark.xfail(reason=\"expected fail\", strict=True)\n    def test_xfail():\n        time.sleep(0.15)\n>       assert False\nE       assert False\n\ndemo-tests/test_realistic_minimal.py:38: AssertionError"
     },
     {
-      "nodeid": "demo-tests/orig/test_0.py::test0_xpass",
-      "outcome": "xfailed",
-      "start_time": "2025-05-28T05:47:14.653573+00:00",
-      "stop_time": "2025-05-28T05:47:14.653733+00:00",
-      "duration": 0.00016,
-      "caplog": "",
-      "capstderr": "",
-      "capstdout": "",
-      "longreprtext": "file /Users/jwr003/coding/pytest-recap/demo-tests/orig/test_0.py, line 104\n  @pytest.mark.xfail()\n  def test0_xpass(logger, capstdout):\nE       fixture 'capstdout' not found\n>       available fixtures: cache, capfd, capfdbinary, caplog, capsys, capsysbinary, class_mocker, cov, doctest_namespace, error_fixture, fake_data, include_metadata_in_junit_xml, json_metadata, logger, metadata, mocker, module_mocker, monkeypatch, no_cover, package_mocker, pytestconfig, random_sleep, record_property, record_testsuite_property, record_xml_attribute, recwarn, session_mocker, test_data, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory\n>       use 'pytest --fixtures [testpath]' for help on them.\n\n/Users/jwr003/coding/pytest-recap/demo-tests/orig/test_0.py:104"
-    },
-    {
-      "nodeid": "demo-tests/orig/test_0.py::test0_xpass_demo",
+      "nodeid": "demo-tests/test_realistic_minimal.py::test_xpass",
       "outcome": "xpassed",
-      "start_time": "2025-05-28T05:47:14.653101+00:00",
-      "stop_time": "2025-05-28T05:47:14.653214+00:00",
-      "duration": 0.000113,
+      "start_time": "2025-06-04T02:42:59.522685+00:00",
+      "stop_time": "2025-06-04T02:42:59.677639+00:00",
+      "duration": 0.154954,
       "caplog": "",
       "capstderr": "",
       "capstdout": "",
-      "longreprtext": "None"
+      "longreprtext": ""
     },
     {
-      "nodeid": "demo-tests/orig/test_0.py::test0_warning",
-      "outcome": "error",
-      "start_time": "2025-05-28T05:47:14.654700+00:00",
-      "stop_time": "2025-05-28T05:47:14.654801+00:00",
-      "duration": 0.000101,
-      "caplog": "",
-      "capstderr": "",
-      "capstdout": "",
-      "longreprtext": "file /Users/jwr003/coding/pytest-recap/demo-tests/orig/test_0.py, line 122\n  def test0_warning(capstdlog):\nE       fixture 'capstdlog' not found\n>       available fixtures: cache, capfd, capfdbinary, caplog, capsys, capsysbinary, class_mocker, cov, doctest_namespace, error_fixture, fake_data, include_metadata_in_junit_xml, json_metadata, logger, metadata, mocker, module_mocker, monkeypatch, no_cover, package_mocker, pytestconfig, random_sleep, record_property, record_testsuite_property, record_xml_attribute, recwarn, session_mocker, test_data, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory\n>       use 'pytest --fixtures [testpath]' for help on them.\n\n/Users/jwr003/coding/pytest-recap/demo-tests/orig/test_0.py:122"
-    },
-    {
-      "nodeid": "demo-tests/orig/test_0.py::test_flaky_3",
-      "outcome": "error",
-      "start_time": "2025-05-28T05:47:14.658394+00:00",
-      "stop_time": "2025-05-28T05:47:14.658502+00:00",
-      "duration": 0.000108,
-      "caplog": "",
-      "capstderr": "",
-      "capstdout": "",
-      "longreprtext": "file /Users/jwr003/coding/pytest-recap/demo-tests/orig/test_0.py, line 131\n  @pytest.mark.flaky(reruns=3)\n  def test_flaky_3(capstderr):\nE       fixture 'capstderr' not found\n>       available fixtures: cache, capfd, capfdbinary, caplog, capsys, capsysbinary, class_mocker, cov, doctest_namespace, error_fixture, fake_data, include_metadata_in_junit_xml, json_metadata, logger, metadata, mocker, module_mocker, monkeypatch, no_cover, package_mocker, pytestconfig, random_sleep, record_property, record_testsuite_property, record_xml_attribute, recwarn, session_mocker, test_data, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory\n>       use 'pytest --fixtures [testpath]' for help on them.\n\n/Users/jwr003/coding/pytest-recap/demo-tests/orig/test_0.py:131"
-    },
-    {
-      "nodeid": "demo-tests/orig/test_0.py::test_always_rerun",
+      "nodeid": "demo-tests/test_realistic_minimal.py::test_rerun",
       "outcome": "rerun",
-      "start_time": "2025-05-28T05:47:14.666805+00:00",
-      "stop_time": "2025-05-28T05:47:14.667215+00:00",
-      "duration": 0.00041,
+      "start_time": "2025-06-04T02:42:59.679639+00:00",
+      "stop_time": "2025-06-04T02:42:59.782916+00:00",
+      "duration": 0.103277,
       "caplog": "",
       "capstderr": "",
       "capstdout": "",
-      "longreprtext": "tmp_path = PosixPath('/private/var/folders/pd/fvjgwfx97wb95q5t2k168sxr0000gn/T/pytest-of-jwr003/pytest-118/test_always_rerun0')\n\n    @pytest.mark.flaky(reruns=2)\n    def test_always_rerun(tmp_path):\n        state_file = tmp_path / \"rerun_state.txt\"\n        if not state_file.exists():\n            state_file.write_text(\"fail\")\n>           assert False, \"Fail first run\"\nE           AssertionError: Fail first run\nE           assert False\n\ndemo-tests/orig/test_0.py:144: AssertionError"
+      "longreprtext": "@pytest.mark.flaky(reruns=1)\n    def test_rerun():\n        # Fails first, passes second\n        if not hasattr(test_rerun, \"called\"):\n            test_rerun.called = True\n            time.sleep(0.1)\n>           assert False, \"fail for rerun\"\nE           AssertionError: fail for rerun\nE           assert False\n\ndemo-tests/test_realistic_minimal.py:51: AssertionError"
     },
     {
-      "nodeid": "demo-tests/orig/test_0.py::test_always_rerun",
-      "outcome": "rerun",
-      "start_time": "2025-05-28T05:47:14.671333+00:00",
-      "stop_time": "2025-05-28T05:47:14.671757+00:00",
-      "duration": 0.000424,
+      "nodeid": "demo-tests/test_realistic_minimal.py::test_error",
+      "outcome": "error",
+      "start_time": "2025-06-04T02:42:59.894893+00:00",
+      "stop_time": "2025-06-04T02:42:59.895318+00:00",
+      "duration": 0.000425,
       "caplog": "",
       "capstderr": "",
       "capstdout": "",
-      "longreprtext": "tmp_path = PosixPath('/private/var/folders/pd/fvjgwfx97wb95q5t2k168sxr0000gn/T/pytest-of-jwr003/pytest-118/test_always_rerun1')\n\n    @pytest.mark.flaky(reruns=2)\n    def test_always_rerun(tmp_path):\n        state_file = tmp_path / \"rerun_state.txt\"\n        if not state_file.exists():\n            state_file.write_text(\"fail\")\n>           assert False, \"Fail first run\"\nE           AssertionError: Fail first run\nE           assert False\n\ndemo-tests/orig/test_0.py:144: AssertionError"
+      "longreprtext": "@pytest.fixture\n    def error_fixture():\n>       raise Exception(\"Error in fixture\")\nE       Exception: Error in fixture\n\ndemo-tests/test_realistic_minimal.py:57: Exception"
     }
   ],
   "rerun_test_groups": [
     {
-      "nodeid": "demo-tests/orig/test_0.py::test_always_rerun",
+      "nodeid": "demo-tests/test_realistic_minimal.py::test_rerun",
       "tests": [
         {
-          "nodeid": "demo-tests/orig/test_0.py::test_always_rerun",
+          "nodeid": "demo-tests/test_realistic_minimal.py::test_rerun",
           "outcome": "rerun",
-          "start_time": "2025-05-28T05:47:14.666805+00:00",
-          "stop_time": "2025-05-28T05:47:14.667215+00:00",
-          "duration": 0.00041,
+          "start_time": "2025-06-04T02:42:59.679639+00:00",
+          "stop_time": "2025-06-04T02:42:59.782916+00:00",
+          "duration": 0.103277,
           "caplog": "",
           "capstderr": "",
           "capstdout": "",
-          "longreprtext": "tmp_path = PosixPath('/private/var/folders/pd/fvjgwfx97wb95q5t2k168sxr0000gn/T/pytest-of-jwr003/pytest-118/test_always_rerun0')\n\n    @pytest.mark.flaky(reruns=2)\n    def test_always_rerun(tmp_path):\n        state_file = tmp_path / \"rerun_state.txt\"\n        if not state_file.exists():\n            state_file.write_text(\"fail\")\n>           assert False, \"Fail first run\"\nE           AssertionError: Fail first run\nE           assert False\n\ndemo-tests/orig/test_0.py:144: AssertionError"
+          "longreprtext": "@pytest.mark.flaky(reruns=1)\n    def test_rerun():\n        # Fails first, passes second\n        if not hasattr(test_rerun, \"called\"):\n            test_rerun.called = True\n            time.sleep(0.1)\n>           assert False, \"fail for rerun\"\nE           AssertionError: fail for rerun\nE           assert False\n\ndemo-tests/test_realistic_minimal.py:51: AssertionError"
         },
         {
-          "nodeid": "demo-tests/orig/test_0.py::test_always_rerun",
-          "outcome": "rerun",
-          "start_time": "2025-05-28T05:47:14.671333+00:00",
-          "stop_time": "2025-05-28T05:47:14.671757+00:00",
-          "duration": 0.000424,
+          "nodeid": "demo-tests/test_realistic_minimal.py::test_rerun",
+          "outcome": "passed",
+          "start_time": "2025-06-04T02:42:59.789393+00:00",
+          "stop_time": "2025-06-04T02:42:59.893555+00:00",
+          "duration": 0.104162,
           "caplog": "",
           "capstderr": "",
           "capstdout": "",
-          "longreprtext": "tmp_path = PosixPath('/private/var/folders/pd/fvjgwfx97wb95q5t2k168sxr0000gn/T/pytest-of-jwr003/pytest-118/test_always_rerun1')\n\n    @pytest.mark.flaky(reruns=2)\n    def test_always_rerun(tmp_path):\n        state_file = tmp_path / \"rerun_state.txt\"\n        if not state_file.exists():\n            state_file.write_text(\"fail\")\n>           assert False, \"Fail first run\"\nE           AssertionError: Fail first run\nE           assert False\n\ndemo-tests/orig/test_0.py:144: AssertionError"
-        },
-        {
-          "nodeid": "demo-tests/orig/test_0.py::test_always_rerun",
-          "outcome": "failed",
-          "start_time": "2025-05-28T05:47:14.675488+00:00",
-          "stop_time": "2025-05-28T05:47:14.675832+00:00",
-          "duration": 0.000344,
-          "caplog": "",
-          "capstderr": "",
-          "capstdout": "",
-          "longreprtext": "tmp_path = PosixPath('/private/var/folders/pd/fvjgwfx97wb95q5t2k168sxr0000gn/T/pytest-of-jwr003/pytest-118/test_always_rerun2')\n\n    @pytest.mark.flaky(reruns=2)\n    def test_always_rerun(tmp_path):\n        state_file = tmp_path / \"rerun_state.txt\"\n        if not state_file.exists():\n            state_file.write_text(\"fail\")\n>           assert False, \"Fail first run\"\nE           AssertionError: Fail first run\nE           assert False\n\ndemo-tests/orig/test_0.py:144: AssertionError"
+          "longreprtext": ""
         }
       ]
     }
   ],
-  "warnings": [],
-  "errors": [
+  "warnings": [
     {
-      "nodeid": "demo-tests/orig/test_0.py::test0_warning",
-      "when": "setup",
-      "outcome": "failed",
-      "message": null,
-      "category": null,
-      "filename": null,
-      "lineno": null,
-      "longrepr": "file /Users/jwr003/coding/pytest-recap/demo-tests/orig/test_0.py, line 122\n  def test0_warning(capstdlog):\nE       fixture 'capstdlog' not found\n>       available fixtures: cache, capfd, capfdbinary, caplog, capsys, capsysbinary, class_mocker, cov, doctest_namespace, error_fixture, fake_data, include_metadata_in_junit_xml, json_metadata, logger, metadata, mocker, module_mocker, monkeypatch, no_cover, package_mocker, pytestconfig, random_sleep, record_property, record_testsuite_property, record_xml_attribute, recwarn, session_mocker, test_data, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory\n>       use 'pytest --fixtures [testpath]' for help on them.\n\n/Users/jwr003/coding/pytest-recap/demo-tests/orig/test_0.py:122",
+      "event_type": "warning",
+      "nodeid": "demo-tests/test_realistic_minimal.py::test_pass",
+      "when": "runtest",
+      "outcome": null,
+      "message": "fixture warning",
+      "category": "UserWarning",
+      "filename": "/Users/jwr003/coding/pytest-recap/demo-tests/test_realistic_minimal.py",
+      "lineno": 12,
+      "longrepr": null,
       "sections": [],
-      "keywords": [
-        "test0_warning",
-        "test_0.py",
-        "orig",
-        "demo-tests",
-        "pytest-recap",
-        ""
-      ],
+      "keywords": [],
       "location": null
     },
     {
-      "nodeid": "demo-tests/orig/test_0.py::test_flaky_3",
+      "event_type": "warning",
+      "nodeid": "demo-tests/test_realistic_minimal.py::test_pass",
+      "when": "runtest",
+      "outcome": null,
+      "message": "passing warning",
+      "category": "UserWarning",
+      "filename": "/Users/jwr003/coding/pytest-recap/demo-tests/test_realistic_minimal.py",
+      "lineno": 20,
+      "longrepr": null,
+      "sections": [],
+      "keywords": [],
+      "location": null
+    },
+    {
+      "event_type": "warning",
+      "nodeid": "demo-tests/test_realistic_minimal.py::test_fail",
+      "when": "runtest",
+      "outcome": null,
+      "message": "fixture warning",
+      "category": "UserWarning",
+      "filename": "/Users/jwr003/coding/pytest-recap/demo-tests/test_realistic_minimal.py",
+      "lineno": 12,
+      "longrepr": null,
+      "sections": [],
+      "keywords": [],
+      "location": null
+    },
+    {
+      "event_type": "warning",
+      "nodeid": "demo-tests/test_realistic_minimal.py::test_fail",
+      "when": "runtest",
+      "outcome": null,
+      "message": "failing warning",
+      "category": "UserWarning",
+      "filename": "/Users/jwr003/coding/pytest-recap/demo-tests/test_realistic_minimal.py",
+      "lineno": 27,
+      "longrepr": null,
+      "sections": [],
+      "keywords": [],
+      "location": null
+    },
+    {
+      "event_type": "warning",
+      "nodeid": "demo-tests/test_realistic_minimal.py::test_warning",
+      "when": "runtest",
+      "outcome": null,
+      "message": "explicit test warning",
+      "category": "UserWarning",
+      "filename": "/Users/jwr003/coding/pytest-recap/demo-tests/test_realistic_minimal.py",
+      "lineno": 67,
+      "longrepr": null,
+      "sections": [],
+      "keywords": [],
+      "location": null
+    }
+  ],
+  "errors": [
+    {
+      "event_type": "warning",
+      "nodeid": "demo-tests/test_realistic_minimal.py::test_error",
       "when": "setup",
       "outcome": "failed",
       "message": null,
       "category": null,
       "filename": null,
       "lineno": null,
-      "longrepr": "file /Users/jwr003/coding/pytest-recap/demo-tests/orig/test_0.py, line 131\n  @pytest.mark.flaky(reruns=3)\n  def test_flaky_3(capstderr):\nE       fixture 'capstderr' not found\n>       available fixtures: cache, capfd, capfdbinary, caplog, capsys, capsysbinary, class_mocker, cov, doctest_namespace, error_fixture, fake_data, include_metadata_in_junit_xml, json_metadata, logger, metadata, mocker, module_mocker, monkeypatch, no_cover, package_mocker, pytestconfig, random_sleep, record_property, record_testsuite_property, record_xml_attribute, recwarn, session_mocker, test_data, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory\n>       use 'pytest --fixtures [testpath]' for help on them.\n\n/Users/jwr003/coding/pytest-recap/demo-tests/orig/test_0.py:131",
+      "longrepr": "@pytest.fixture\n    def error_fixture():\n>       raise Exception(\"Error in fixture\")\nE       Exception: Error in fixture\n\ndemo-tests/test_realistic_minimal.py:57: Exception",
       "sections": [],
       "keywords": [
-        "test_flaky_3",
-        "flaky",
-        "pytestmark",
-        "test_0.py",
-        "orig",
-        "demo-tests",
-        "pytest-recap",
-        ""
+        "test_error",
+        "demo-tests/test_realistic_minimal.py",
+        "pytest-recap"
       ],
       "location": null
     }
   ],
   "session_stats": {
-    "passed": 2,
-    "failed": 2,
+    "passed": 5,
+    "failed": 1,
     "skipped": 1,
-    "xfailed": 2,
+    "xfailed": 1,
     "xpassed": 1,
-    "error": 2,
-    "rerun": 2,
-    "warnings": 0
+    "rerun": 1,
+    "error": 1,
+    "warnings": 5
   }
 }
 ```

@@ -1,6 +1,6 @@
 import json
 
-from recap_json_to_html import format_human_duration, main
+from scripts.recap_json_to_html import format_human_duration, main
 
 
 def test_format_human_duration_basic():

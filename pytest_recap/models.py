@@ -187,6 +187,7 @@ class RerunTestGroup:
         nodeid (str): Test node ID.
         tests (List[TestResult]): List of TestResult objects for each rerun.
     """
+
     __test__ = False
     nodeid: str
     tests: List["TestResult"] = field(default_factory=list)
@@ -202,9 +203,7 @@ class RerunTestGroup:
             return None
 
         # Make sure only one test has an outcome that is not "rerun"
-        non_rerun_count = sum(
-            test.outcome.value.lower() != "rerun" for test in self.tests
-        )
+        non_rerun_count = sum(test.outcome.value.lower() != "rerun" for test in self.tests)
         assert non_rerun_count == 1, f"Expected at most one non-rerun test, got {non_rerun_count} instead"
 
         # The final outcome is the outcome of the only test that is not a rerun
@@ -231,7 +230,6 @@ class RerunTestGroup:
             tests=[TestResult.from_dict(test_dict) for test_dict in data.get("tests", [])],
         )
         return group
-
 
 
 class TestSessionStats:
@@ -262,7 +260,10 @@ class TestSessionStats:
         )
         self.total = len(test_results)
         # Add warnings as a separate count
-        self.counter["warnings"] = warnings_count
+        if warnings_count:
+            self.counter["warnings"] = warnings_count
+        else:
+            del self.counter["warnings"]
 
     def count(self, key: str) -> int:
         """Return the count for a given outcome or event (case-insensitive string)."""
@@ -270,7 +271,11 @@ class TestSessionStats:
 
     def as_dict(self) -> Dict[str, int]:
         """Return all session-level event counts as a dict, with 'testoutcome.' prefix removed from keys."""
-        return {k[len("testoutcome.") :] if k.startswith("testoutcome.") else k: v for k, v in self.counter.items()}
+        return {
+            (k[len("testoutcome.") :] if k.startswith("testoutcome.") else k): v
+            for k, v in self.counter.items()
+            if v > 0
+        }
 
     def __str__(self) -> str:
         """Return a string representation of the TestSessionStats object."""

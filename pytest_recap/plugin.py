@@ -203,6 +203,18 @@ def pytest_terminal_summary(terminalreporter: TerminalReporter, exitstatus: int,
 
 
 # --- pytest-recap-specific functions, only used internally --- #
+def to_datetime(val: Optional[float]) -> Optional[datetime]:
+    """Convert a timestamp to a datetime object.
+
+    Args:
+        val (Optional[float]): The timestamp to convert.
+
+    Returns:
+        Optional[datetime]: The datetime object, or None if the timestamp is None.
+    """
+    return datetime.fromtimestamp(val, timezone.utc) if val is not None else None
+
+
 def collect_test_results_and_session_times(
     terminalreporter: TerminalReporter,
 ) -> Tuple[List[TestResult], datetime, datetime]:
@@ -213,45 +225,63 @@ def collect_test_results_and_session_times(
 
     Returns:
         tuple: A tuple containing the list of test results, session start time, and session end time.
-
     """
     stats: Dict[str, List[TestReport]] = terminalreporter.stats
     test_results: List[TestResult] = []
     session_start: Optional[datetime] = None
     session_end: Optional[datetime] = None
 
-    def to_dt(val: Optional[float]) -> Optional[datetime]:
-        return datetime.fromtimestamp(val, timezone.utc) if val is not None else None
-
-    for outcome, reports in stats.items():
+    for outcome, report_list in stats.items():
+        # Skip orocessing '' outcomes (which are for setup phase), and 'warnings'
+        # (which we count warnings elsewhere, in pytest_warning_recorded)
         if not outcome or outcome == "warnings":
             continue
-        for report in reports:
+
+        for report in report_list:
             if not isinstance(report, TestReport):
                 continue
+
+            # Only process 'call' phase, and 'setup'/'teardown' phases for failed, error, or skipped tests
+            # TODO: why did i do this again?
             if report.when == "call" or (
                 report.when in ("setup", "teardown") and report.outcome in ("failed", "error", "skipped")
             ):
-                report_time = to_dt(getattr(report, "start", None) or getattr(report, "starttime", None))
-                report_end = to_dt(getattr(report, "stop", None) or getattr(report, "stoptime", None))
+                # Get start and end times from TestReport, and store them as datetime objects
+                report_time = to_datetime(getattr(report, "start", None) or getattr(report, "starttime", None))
+                report_end = to_datetime(getattr(report, "stop", None) or getattr(report, "stoptime", None))
+
+                # Update session start and end times if necessary
                 if session_start is None or (report_time and report_time < session_start):
                     session_start = report_time
                 if session_end is None or (report_end and report_end > session_end):
                     session_end = report_end
+
+                # longrepr can be a string, and object or None; whereas capstdout, capstderr, and caplog
+                # are always strings
+                longrepr = getattr(report, "longrepr", "")
+                longreprtext = str(longrepr) if longrepr is not None else ""
+                capstdout = getattr(report, "capstdout", "")
+                capstderr = getattr(report, "capstderr", "")
+                caplog = getattr(report, "caplog", "")
+
+                # Create TestResult object and append to list to return
                 test_results.append(
                     {
                         "nodeid": report.nodeid,
                         "outcome": outcome,
                         "start_time": report_time,
                         "stop_time": report_end,
-                        "longreprtext": str(getattr(report, "longrepr", "")),
-                        "capstdout": getattr(report, "capstdout", ""),
-                        "capstderr": getattr(report, "capstderr", ""),
-                        "caplog": getattr(report, "caplog", ""),
+                        "longreprtext": longreprtext,
+                        "capstdout": capstdout,
+                        "capstderr": capstderr,
+                        "caplog": caplog,
                     }
                 )
+
+    # Set session start and end times to either the times found in the test results or the current time
     session_start = session_start or datetime.now(timezone.utc)
     session_end = session_end or datetime.now(timezone.utc)
+
     return test_results, session_start, session_end
 
 
@@ -267,13 +297,13 @@ def build_rerun_groups(test_results: List[TestResult]) -> List[RerunTestGroup]:
     """
     test_result_objs = [
         TestResult(
-            nodeid=tr["nodeid"],
-            outcome=tr["outcome"],
-            longreprtext=tr["longreprtext"],
-            start_time=tr["start_time"],
-            stop_time=tr["stop_time"],
+            nodeid=test_result["nodeid"],
+            outcome=test_result["outcome"],
+            longreprtext=test_result["longreprtext"],
+            start_time=test_result["start_time"],
+            stop_time=test_result["stop_time"],
         )
-        for tr in test_results
+        for test_result in test_results
     ]
     rerun_test_groups: Dict[str, RerunTestGroup] = {}
     for test_result in test_result_objs:
@@ -317,10 +347,20 @@ def parse_dict_option(
         return default
 
 
-def get_recap_option(config, opt, ini, envvar, default=""):
+def get_recap_option(config: Config, opt: str, ini: str, envvar: str, default: str = "") -> str:
     """Retrieve the raw option value for a recap option from CLI, environment variable, pytest.ini, or default.
     This function is responsible for determining the source (precedence order: CLI > env > ini > default),
     but does NOT parse the value into a dict—it always returns a string.
+
+    Args:
+        config (Config): The pytest Config object.
+        opt (str): The option name (the pytest cmd-line flag).
+        ini (str): The ini option name (the pytest ini file option).
+        envvar (str): The environment variable name.
+        default (str, optional): The default value. Defaults to "".
+
+    Returns:
+        str: The option value to use.
     """
     cli_val = getattr(config.option, opt, None)
     if cli_val is not None and str(cli_val).strip() != "":
@@ -417,7 +457,7 @@ def build_recap_session(
         session_tags = {}
 
     # Session stats
-    test_result_objs: List[TestResult] = [TestResult.from_dict(tr) for tr in test_results]
+    test_result_objs: List[TestResult] = [TestResult.from_dict(test_result) for test_result in test_results]
     session_stats = TestSessionStats(test_result_objs, warnings_count=len(warnings))
 
     # Build and return session

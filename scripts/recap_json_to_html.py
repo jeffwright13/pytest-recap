@@ -2,12 +2,13 @@ import json
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 from jinja2 import Environment, FileSystemLoader
 from pytest_recap.models import RerunTestGroup
 
 
-def format_human_duration(seconds: float) -> str:
+def format_human_duration(seconds: Optional[float]) -> str:
     if seconds is None:
         return "N/A"
     try:
@@ -114,11 +115,11 @@ def render_report(json_path: Path, html_path: Path, template_dir: Path) -> None:
 
 
 def main(json_path, html_path):
-    render_report(Path(json_path), Path(html_path), Path("templates"))
+    render_report(Path(json_path), Path(html_path), Path("scripts/templates"))
 
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
         print("Usage: python recap_json_to_html.py <input.json> <output.html>")
         sys.exit(1)
-    render_report(Path(sys.argv[1]), Path(sys.argv[2]), Path("templates"))
+    main(Path(sys.argv[1]), Path(sys.argv[2]))
