@@ -1,15 +1,26 @@
-import typer
 import glob
 import json
-import pandas as pd
 from pathlib import Path
 from typing import List
 
+import typer
+from pytest_recap.models import TestSession
+
 app = typer.Typer()
 
-def load_sessions_from_file(filepath: str) -> List[dict]:
-    with open(filepath, 'r') as f:
-        return json.load(f)
+
+def load_sessions_from_file(filepath: str) -> List[TestSession]:
+    """Load a list of TestSession objects from a JSON file. Accepts either a list or a single session dict."""
+    with open(filepath, "r") as f:
+        data = json.load(f)
+    if isinstance(data, list):
+        return [TestSession.from_dict(item) for item in data]
+    elif isinstance(data, dict):
+        # Accept a single session dict as a one-item list
+        return [TestSession.from_dict(data)]
+    else:
+        raise ValueError(f"Expected a list or dict in {filepath}, got {type(data)}")
+
 
 def clean_empty_structs(obj):
     if isinstance(obj, dict):
@@ -23,6 +34,7 @@ def clean_empty_structs(obj):
     else:
         return obj
 
+
 def serialize_nested_fields(session):
     # These are the fields expected to be JSON strings for Parquet compatibility
     for key in ["test_results", "rerun_test_groups", "session_tags", "testing_system"]:
@@ -30,37 +42,52 @@ def serialize_nested_fields(session):
             session[key] = json.dumps(session[key])
     return session
 
+
 @app.command()
 def merge_sessions(
-    input_glob: str = typer.Option(None, help='Glob pattern for input JSON files'),
-    input_files: str = typer.Option(None, help='Comma-separated list of input JSON files'),
-    input_dir: str = typer.Option('.', help='Directory to search for JSON files'),
-    output_parquet: str = typer.Option(None, help='Output Parquet file path'),
-    output_json: str = typer.Option(None, help='Output JSON file path')
+    input_glob: str = typer.Option(None, help='Glob pattern for input JSON files (default: "*.json")'),
+    input_files: str = typer.Option(None, help="Comma-separated list of input JSON files"),
+    input_dir: str = typer.Option(".", help="Directory to search for JSON files"),
+    recurse: bool = typer.Option(
+        False, "--recurse/--no-recurse", help="Recursively search input_dir for files (default: False)"
+    ),
+    output_parquet: str = typer.Option(None, help="Output Parquet file path"),
+    output_json: str = typer.Option(None, help="Output JSON file path"),
 ):
     """
     Merge all TestSession JSON files, deduplicate by session_id, and export to Parquet and/or JSON.
     Accepts either a glob pattern or a comma-separated list of files.
+    If only input_dir is given, merges all .json files (non-recursive by default).
     """
     files = []
     if input_files:
-        # Split and strip each filename
-        files = [f.strip() for f in input_files.split(',') if f.strip()]
-    elif input_glob:
-        search_path = str(Path(input_dir) / input_glob)
-        files = glob.glob(search_path)
+        files = [f.strip() for f in input_files.split(",") if f.strip()]
     else:
-        typer.secho("No input_glob or input_files specified.", fg=typer.colors.RED)
+        # Determine glob pattern
+        pattern = input_glob or "*.json"
+        if recurse:
+            # Use **/ for recursive glob
+            search_path = (
+                str(Path(input_dir) / "**" / pattern)
+                if not pattern.startswith("**/")
+                else str(Path(input_dir) / pattern)
+            )
+            files = glob.glob(search_path, recursive=True)
+        else:
+            search_path = str(Path(input_dir) / pattern)
+            files = glob.glob(search_path, recursive=False)
+    if not files:
+        typer.secho(
+            f"No input files found with pattern '{input_glob or '*.json'}' in {input_dir} (recurse={recurse})",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(code=1)
 
     typer.echo(f"Found {len(files)} files: {files}")
-    all_sessions = []
+    all_sessions: List[TestSession] = []
     for file in files:
         try:
             sessions = load_sessions_from_file(file)
-            if not isinstance(sessions, list):
-                typer.secho(f"File {file} does not contain a list. Skipping.", fg=typer.colors.YELLOW)
-                continue
             all_sessions.extend(sessions)
         except Exception as e:
             typer.secho(f"Error loading {file}: {e}", fg=typer.colors.RED)
@@ -68,7 +95,10 @@ def merge_sessions(
     session_map = {}
     duplicates = 0
     for session in all_sessions:
-        session_id = session.get('session_id')
+        # Defensive: convert any dicts to TestSession
+        if isinstance(session, dict):
+            session = TestSession.from_dict(session)
+        session_id = getattr(session, "session_id", None)
         if session_id is None:
             typer.secho(f"Session missing 'session_id': {session}", fg=typer.colors.YELLOW)
             continue
@@ -84,35 +114,71 @@ def merge_sessions(
     typer.echo(f"Unique sessions: {len(session_map)}")
     typer.echo(f"Duplicates found: {duplicates}")
 
-    # Clean empty dicts/lists in all sessions for Parquet
-    cleaned_sessions = [serialize_nested_fields(clean_empty_structs(session)) for session in session_map.values()]
+    # Ensure all sessions in session_map are TestSession objects
+    session_map = {k: TestSession.from_dict(v) if isinstance(v, dict) else v for k, v in session_map.items()}
+
+    # Validate round-trip serialization for all sessions
+    round_trip_ok = True
+    for s in session_map.values():
+        try:
+            d = s.to_dict()
+            TestSession.from_dict(d)  # Should not raise
+        except Exception as e:
+            typer.secho(
+                f"Round-trip serialization failed for session {getattr(s, 'session_id', None)}: {e}",
+                fg=typer.colors.RED,
+            )
+            round_trip_ok = False
+    if round_trip_ok:
+        typer.secho("All sessions passed round-trip serialization/deserialization.", fg=typer.colors.GREEN)
+    else:
+        typer.secho("Some sessions failed round-trip serialization/deserialization.", fg=typer.colors.RED)
 
     if output_parquet:
-        import pandas as pd
-        df = pd.DataFrame(cleaned_sessions)
-        df.to_parquet(output_parquet, index=False)
-        typer.secho(f"Merged and deduplicated sessions exported to {output_parquet}", fg=typer.colors.GREEN)
+        try:
+            import pandas as pd
 
-    if output_json:
-        import json
-        with open(output_json, 'w') as f:
-            json.dump(list(session_map.values()), f, indent=2)
-        typer.secho(f"Merged and deduplicated sessions exported to {output_json}", fg=typer.colors.GREEN)
+            df = pd.DataFrame([s.to_dict() for s in session_map.values()])
+            df.to_parquet(output_parquet, index=False)
+            typer.secho(f"Merged and deduplicated sessions exported to {output_parquet}", fg=typer.colors.GREEN)
+        except ImportError:
+            typer.secho("pandas is required for Parquet export. Please install pandas.", fg=typer.colors.RED)
 
-    if not output_parquet and not output_json:
-        typer.secho("No output format specified. Use --output-parquet and/or --output-json.", fg=typer.colors.RED)
+    # Default output_json if not specified
+    output_json_path = output_json or str(Path.cwd() / "merged_sessions.json")
+    with open(output_json_path, "w") as f:
+        json.dump([s.to_dict() for s in session_map.values()], f, indent=2, default=str)
+    typer.secho(f"Merged and deduplicated sessions exported to {output_json_path}", fg=typer.colors.GREEN)
+
+    # Always: Validate round-trip serialization of merged output
+    with open(output_json_path, "r") as f:
+        merged_data = json.load(f)
+    errors = 0
+    for i, s in enumerate(merged_data):
+        try:
+            TestSession.from_dict(s)
+        except Exception as e:
+            typer.secho(f"Round-trip validation failed for session {i}: {e}", fg=typer.colors.RED)
+            errors += 1
+    if errors == 0:
+        typer.secho("All merged sessions passed round-trip serialization/deserialization.", fg=typer.colors.GREEN)
+    else:
+        typer.secho(f"{errors} session(s) failed round-trip validation.", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+
 
 @app.command()
 def export_postgres(
     input_json: str = typer.Option(..., help="Path to merged JSON file"),
     db_url: str = typer.Option(..., help="Postgres connection string, e.g. postgresql://user:pass@host/dbname"),
-    table_prefix: str = typer.Option("insight_", help="Prefix for table names (default: 'insight_')")
+    table_prefix: str = typer.Option("insight_", help="Prefix for table names (default: 'insight_')"),
 ):
     """
     Export merged TestSession JSON to a normalized PostgreSQL schema for BI tools like Metabase.
     """
-    import psycopg2
     import json
+
+    import psycopg2
 
     sessions_table = f"{table_prefix}sessions"
     rerun_groups_table = f"{table_prefix}rerun_groups"
@@ -188,16 +254,21 @@ def export_postgres(
     conn.commit()
     cur.close()
     conn.close()
-    typer.secho(f"Export to PostgreSQL completed successfully! Tables used: {sessions_table}, {rerun_groups_table}, {test_results_table}", fg=typer.colors.GREEN)
+    typer.secho(
+        f"Export to PostgreSQL completed successfully! Tables used: {sessions_table}, {rerun_groups_table}, {test_results_table}",
+        fg=typer.colors.GREEN,
+    )
+
 
 @app.command()
 def clear_postgres(
-    db_url: str = typer.Option(..., help="Postgres connection string, e.g. postgresql://user:pass@host/dbname")
+    db_url: str = typer.Option(..., help="Postgres connection string, e.g. postgresql://user:pass@host/dbname"),
 ):
     """
     Clear all data from test_results, rerun_test_groups, and test_sessions tables in the correct order.
     """
     import psycopg2
+
     conn = psycopg2.connect(db_url)
     cur = conn.cursor()
     cur.execute("TRUNCATE TABLE test_results, rerun_test_groups, test_sessions RESTART IDENTITY CASCADE;")
@@ -205,6 +276,7 @@ def clear_postgres(
     cur.close()
     conn.close()
     typer.secho("All tables truncated and identities reset.", fg=typer.colors.GREEN)
+
 
 if __name__ == "__main__":
     app()

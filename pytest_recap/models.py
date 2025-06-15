@@ -353,7 +353,7 @@ class TestSession:
 
     @classmethod
     def from_dict(cls, d):
-        """Create a TestSession from a dictionary. Ensures warnings count is passed to TestSessionStats."""
+        """Create a TestSession from a dictionary. Ensures all nested fields are model objects."""
         if not isinstance(d, dict):
             raise ValueError(f"Invalid data for TestSession. Expected dict, got {type(d)}")
         session_start_time = d.get("session_start_time")
@@ -362,8 +362,14 @@ class TestSession:
         session_stop_time = d.get("session_stop_time")
         if isinstance(session_stop_time, str):
             session_stop_time = datetime.fromisoformat(session_stop_time)
-        test_results = [TestResult.from_dict(test_result) for test_result in d.get("test_results", [])]
-        warnings = [RecapEvent(**w) if not isinstance(w, RecapEvent) else w for w in d.get("warnings", [])]
+        # Always convert nested fields
+        test_results = [TestResult.from_dict(tr) if isinstance(tr, dict) else tr for tr in d.get("test_results", [])]
+        rerun_test_groups = [
+            RerunTestGroup.from_dict(g) if isinstance(g, dict) else g for g in d.get("rerun_test_groups", [])
+        ]
+        warnings = [RecapEvent(**w) if isinstance(w, dict) else w for w in d.get("warnings", [])]
+        errors = [RecapEvent(**e) if isinstance(e, dict) else e for e in d.get("errors", [])]
+        # Always reconstruct session_stats from test_results and warnings
         session_stats = TestSessionStats(test_results, warnings_count=len(warnings))
         return cls(
             session_id=d.get("session_id"),
@@ -373,9 +379,9 @@ class TestSession:
             session_tags=d.get("session_tags", {}),
             testing_system=d.get("testing_system", {}),
             test_results=test_results,
-            rerun_test_groups=[RerunTestGroup.from_dict(g) for g in d.get("rerun_test_groups", [])],
+            rerun_test_groups=rerun_test_groups,
             warnings=warnings,
-            errors=d.get("errors", []),
+            errors=errors,
             session_stats=session_stats,
         )
 
