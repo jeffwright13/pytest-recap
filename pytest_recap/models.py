@@ -259,23 +259,24 @@ class TestSessionStats:
             str(getattr(test_result, "outcome", test_result)).lower() for test_result in test_results
         )
         self.total = len(test_results)
-        # Add warnings as a separate count
-        if warnings_count:
-            self.counter["warnings"] = warnings_count
-        else:
-            del self.counter["warnings"]
+        # Add warnings as a separate count (always present, even if zero)
+        self.counter["warnings"] = warnings_count
 
     def count(self, key: str) -> int:
         """Return the count for a given outcome or event (case-insensitive string)."""
         return self.counter.get(key.lower(), 0)
 
     def as_dict(self) -> Dict[str, int]:
-        """Return all session-level event counts as a dict, with 'testoutcome.' prefix removed from keys."""
-        return {
+        """Return all session-level event counts as a dict, with 'testoutcome.' prefix removed from keys. Always include 'warnings' if present in counter, even if zero."""
+        d = {
             (k[len("testoutcome.") :] if k.startswith("testoutcome.") else k): v
             for k, v in self.counter.items()
             if v > 0
         }
+        # Always include 'warnings' if present in counter, even if zero
+        if "warnings" in self.counter and "warnings" not in d:
+            d["warnings"] = 0
+        return d
 
     def __str__(self) -> str:
         """Return a string representation of the TestSessionStats object."""

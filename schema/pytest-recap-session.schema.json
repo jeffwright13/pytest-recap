@@ -1,0 +1,101 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "pytest-recap Test Session Report",
+  "description": "Schema for a single pytest-recap test session report. This schema describes the structure of recap.json output.",
+  "type": "object",
+  "properties": {
+    "session_id": { "type": "string" },
+    "session_start_time": { "type": "string", "format": "date-time", "description": "Timezone-aware UTC ISO 8601 timestamp" },
+    "session_stop_time": { "type": "string", "format": "date-time", "description": "Timezone-aware UTC ISO 8601 timestamp" },
+    "system_under_test": {
+      "type": "object",
+      "description": "User-extensible metadata about the system under test",
+      "additionalProperties": true
+    },
+    "testing_system": {
+      "type": "object",
+      "description": "Metadata about the test runner environment",
+      "properties": {
+        "hostname": { "type": "string" },
+        "platform": { "type": "string" },
+        "python_version": { "type": "string" },
+        "pytest_version": { "type": "string" },
+        "environment": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "test_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "nodeid": { "type": "string" },
+          "outcome": {
+            "type": "string",
+            "enum": ["passed", "failed", "skipped", "error", "xfailed", "xpassed", "rerun", "unknown"]
+          },
+          "start_time": { "type": "string", "format": "date-time" },
+          "stop_time": { "type": "string", "format": "date-time" },
+          "duration": { "type": "number" },
+          "caplog": { "type": ["string", "null"] },
+          "capstderr": { "type": ["string", "null"] },
+          "capstdout": { "type": ["string", "null"] },
+          "longreprtext": { "type": ["string", "null"] }
+        },
+        "required": ["nodeid", "outcome", "start_time", "stop_time", "duration"]
+      }
+    },
+    "rerun_test_groups": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "tests": {
+            "type": "array",
+            "items": { "type": "object" }
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "session_stats": {
+      "type": "object",
+      "properties": {
+        "passed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "skipped": { "type": "integer", "minimum": 0 },
+        "xfailed": { "type": "integer", "minimum": 0 },
+        "xpassed": { "type": "integer", "minimum": 0 },
+        "error": { "type": "integer", "minimum": 0 },
+        "rerun": { "type": "integer", "minimum": 0 },
+        "warnings": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["passed", "failed", "skipped", "xfailed", "xpassed", "error", "rerun", "warnings"],
+      "additionalProperties": false
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "errors": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "session_tags": {
+      "type": "object",
+      "description": "Optional user-defined tags for the session",
+      "additionalProperties": true
+    }
+  },
+  "required": [
+    "session_id",
+    "session_start_time",
+    "session_stop_time",
+    "system_under_test",
+    "testing_system",
+    "test_results",
+    "rerun_test_groups",
+    "session_stats"
+  ],
+  "additionalProperties": false
+}
