@@ -28,13 +28,6 @@
     .summary-stats { margin-bottom: 2em; }
     .pie-chart-container { width: 320px; margin: 1em 0; }
   </style>
-  <style>
-    .ansi2html-content {
-      font-family: monospace;
-      white-space: pre-wrap;
-      word-break: break-all;
-    }
-  </style>
 </head>
 <body>
   <h1>pytest-recap Test Report</h1>
@@ -309,10 +302,10 @@
       </tr>
       <tr id="{{ row_id }}" class="details-row">
         <td colspan="5">
-          <strong>Captured stdout:</strong><div class="ansi2html-content">{{ test.capstdout_html | safe }}</div>
-          <strong>Captured stderr:</strong><div class="ansi2html-content">{{ test.capstderr_html | safe }}</div>
-          <strong>Captured log:</strong><div class="ansi2html-content">{{ test.caplog_html | safe }}</div>
-          <strong>Error/Traceback:</strong><div class="ansi2html-content">{{ test.longreprtext_html | safe }}</div>
+          <strong>Captured stdout:</strong><pre>{{ test.capstdout or "(none)" }}</pre>
+          <strong>Captured stderr:</strong><pre>{{ test.capstderr or "(none)" }}</pre>
+          <strong>Captured log:</strong><pre>{{ test.caplog or "(none)" }}</pre>
+          <strong>Error/Traceback:</strong><pre>{{ test.longreprtext or "(none)" }}</pre>
         </td>
       </tr>
       {% endfor %}
