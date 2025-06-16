@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>pytest-recap Test Report</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: sans-serif; margin: 2em; }
+    table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+    th, td { border: 1px solid #ccc; padding: 0.5em; overflow-wrap: break-word; word-break: break-word; }
+    th { background: #f4f4f4; cursor: pointer; text-align: left; }
+    .test-title-cell { cursor: pointer; text-decoration: underline; color: #1976d2; width: 27em; min-width: 18em; }
+    .test-title-cell:hover { background: #f0f7ff; }
+    .col-outcome, .col-duration { width: 6em; min-width: 4em; }
+    .details-row td { max-width: none; word-break: break-word; }
+    .details-row pre { white-space: pre-wrap; word-break: break-word; max-width: none; overflow-x: auto; }
+    tr.passed  {}
+    tr.failed  {}
+    tr.skipped {}
+    tr.error   {}
+    tr.xfailed {}
+    tr.xpassed {}
+    tr.rerun   {}
+    /* tr.unknown {} */
+    .outcome-dot { display:inline-block; width:12px; height:12px; border-radius:50%; margin-right:6px; }
+    .expand-btn { cursor: pointer; color: #1976d2; text-decoration: underline; }
+    .details-row { display: none; background: #f9f9f9; }
+    .summary-stats { margin-bottom: 2em; }
+    .pie-chart-container { width: 320px; margin: 1em 0; }
+  </style>
+  <style>
+    .ansi2html-content {
+      font-family: monospace;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <h1>pytest-recap Test Report</h1>
+  <div class="summary-stats" style="display: flex; align-items: flex-start; gap: 2em;">
+    <div>
+      <h2>Summary</h2>
+      <div style="margin-bottom: 0.5em; font-size: 1.1em;">
+        {{ total }} tests ran in {{ human_duration }}
+      </div>
+      <ul>
+        {% for outcome, color in outcome_color_map.items() %}
+          {% if outcome_counts.get(outcome, 0) > 0 %}
+            <li><span class="outcome-dot" style="background:{{ color }}"></span> <strong>{{ outcome.title() }}:</strong> {{ outcome_counts[outcome] }} ({{ outcome_percentages[outcome] }}%)</li>
+          {% endif %}
+        {% endfor %}
+      </ul>
+    </div>
+    <div class="pie-chart-container">
+      <canvas id="{{ chart_id }}"></canvas>
+    </div>
+  </div>
+
+  <details>
+    <summary><strong>Session Metadata</strong></summary>
+    <ul>
+      <li><strong>Session start:</strong> {{ session.get("session_start_time", "N/A") }}</li>
+      <li><strong>Session stop:</strong> {{ session.get("session_stop_time", "N/A") }}</li>
+      <li><strong>Duration:</strong> {{ human_duration }}</li>
+      <li><strong>System Under Test:</strong> {{ system_under_test.get("name", "N/A") }}</li>
+      <li><strong>Host:</strong> {{ testing_system.get("hostname", "N/A") }}</li>
+      <li><strong>Platform:</strong> {{ testing_system.get("platform", "N/A") }}</li>
+      <li><strong>Python:</strong> {{ testing_system.python_version }}</li>
+      <li><strong>Pytest:</strong> {{ testing_system.pytest_version }}</li>
+      <li><strong>Environment:</strong> {{ testing_system.environment }}</li>
+      {% if generated_at %}
+      <li><strong>HTML File Generated:</strong> {{ generated_at }}</li>
+      {% endif %}
+    </ul>
+  </details>
+
+  <details>
+    <summary><strong>Warnings ({{ warnings | length }})</strong></summary>
+    {% if warnings %}
+    <table id="warnings-table" class="sortable">
+      <thead>
+        <tr>
+          <th>Test Node Id</th>
+          <th>When</th>
+          <th>Category</th>
+          <th>Filename</th>
+          <th>Line</th>
+          <th>Message</th>
+        </tr>
+      </thead>
+      <tbody>
+
+        {% for w in warnings %}
+        <tr>
+          <td>{{ w.nodeid or 'N/A' }}</td>
+          <td>{{ w.when or 'N/A' }}</td>
+          <td>{{ w.category or 'N/A' }}</td>
+          <td>{{ w.filename or 'N/A' }}</td>
+          <td>{{ w.lineno if w.lineno is not none else 'N/A' }}</td>
+          <td>{{ w.message or 'N/A' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <script>
+      // Make Warnings table sortable by any column
+      document.addEventListener("DOMContentLoaded", function () {
+        var table = document.getElementById("warnings-table");
+        if (!table) return;
+        var thead = table.querySelector("thead");
+        thead.addEventListener("click", function (e) {
+          const th = e.target.closest("th");
+          if (!th) return;
+          const tbody = table.querySelector("tbody");
+          const colIndex = Array.from(th.parentNode.children).indexOf(th);
+          const rows = Array.from(tbody.querySelectorAll("tr:not(.details-row)"));
+          const isNumeric = !isNaN(rows[0].cells[colIndex]?.innerText.trim());
+          const sorted = rows.sort((a, b) => {
+            const aVal = a.cells[colIndex].innerText.trim();
+            const bVal = b.cells[colIndex].innerText.trim();
+            return isNumeric
+              ? parseFloat(aVal) - parseFloat(bVal)
+              : aVal.localeCompare(bVal);
+          });
+          tbody.innerHTML = "";
+          sorted.forEach((row) => tbody.appendChild(row));
+        });
+      });
+    </script>
+    {% else %}<p>No warnings.</p>{% endif %}
+  </details>
+
+  <details>
+    <summary><strong>Errors ({{ errors | length }})</strong></summary>
+    {% if errors %}
+    <table id="errors-table" class="sortable">
+      <thead>
+        <tr>
+          <th>Test Node Id</th>
+          <th>When</th>
+          <th>Outcome</th>
+          <th>Message</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in errors %}
+        <tr>
+          <td>{{ e.nodeid or 'N/A' }}</td>
+          <td>{{ e.when or 'N/A' }}</td>
+          <td>{{ e.outcome or 'N/A' }}</td>
+          <td>{{ e.message or e.longrepr or e.longreprtext or '(no message)' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <script>
+      // Make Errors table sortable by any column
+      document.addEventListener("DOMContentLoaded", function () {
+        var table = document.getElementById("errors-table");
+        if (!table) return;
+        var thead = table.querySelector("thead");
+        var lastSort = { col: null, dir: 1 };
+        thead.addEventListener("click", function (e) {
+          const th = e.target.closest("th");
+          if (!th) return;
+          const colIndex = Array.from(th.parentNode.children).indexOf(th);
+          const tbody = table.querySelector("tbody");
+          const rows = Array.from(tbody.querySelectorAll("tr:not(.details-row)"));
+          const isNumeric = rows.every(row => !isNaN(row.cells[colIndex]?.innerText.trim()));
+          lastSort.dir = (lastSort.col === colIndex) ? -lastSort.dir : 1;
+          lastSort.col = colIndex;
+          const sorted = rows.sort((a, b) => {
+            const aVal = a.cells[colIndex].innerText.trim();
+            const bVal = b.cells[colIndex].innerText.trim();
+            if (isNumeric) {
+              return lastSort.dir * (parseFloat(aVal) - parseFloat(bVal));
+            } else {
+              return lastSort.dir * aVal.localeCompare(bVal);
+            }
+          });
+          tbody.innerHTML = "";
+          sorted.forEach(row => tbody.appendChild(row));
+        });
+      });
+    </script>
+    {% else %}<p>No errors.</p>{% endif %}
+  </details>
+
+  <details class="rerun-group">
+    <summary><strong>Rerun Test Groups ({{ rerun_test_groups | length }})</strong></summary>
+    {% if rerun_test_groups %}
+      <style>
+        table.rerun-groups th {
+          cursor: pointer;
+        }
+
+        .outcome-passed  { background-color: #e6f4e6; }
+        .outcome-failed  { background-color: #fdd; }
+        .outcome-skipped { background-color: #fff4e0; }
+        .outcome-error   { background-color: #f3e6f7; }
+        .outcome-xfailed { background-color: #e5f2fd; }
+        .outcome-xpassed { background-color: #ddf8f9; }
+        .outcome-rerun   { background-color: #eef0f1; }
+        .outcome-unknown { background-color: #e9e9e9; }
+
+        .narrow-col {
+          min-width: 70px;
+          white-space: nowrap;
+        }
+
+        .group-header {
+          background-color: #f0f0f0;
+          border-top: 2px solid #999;
+        }
+      </style>
+
+      <table class="rerun-groups" style="width: 100%; border-collapse: collapse; margin-top: 1em; font-size: 0.95em;">
+        <thead>
+          <tr style="border-bottom: 2px solid #000;">
+            <th>Test Node ID</th>
+            <th class="narrow-col">#</th>
+            <th class="narrow-col">Duration (s)</th>
+            <th class="narrow-col">Start Time</th>
+            <th class="narrow-col">Stop Time</th>
+            <th>Outcome</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for group in rerun_test_groups %}
+            <tr class="group-header">
+              <td colspan="6">{{ group.nodeid }} ({{ group.tests | length }} run{{ 's' if group.tests | length > 1 else '' }})</td>
+            </tr>
+            {% for test in group.tests %}
+            <tr class="test-row outcome-{{ test.outcome.value.lower() }}">
+              <td>{{ test.nodeid }}</td>
+              <td>{{ loop.index }}</td>
+              <td>{{ test.duration or 'N/A' }}</td>
+              <td>{{ test.start_time or 'N/A' }}</td>
+              <td>{{ test.stop_time or 'N/A' }}</td>
+              <td>{{ test.outcome.value }}</td>
+            </tr>
+            {% endfor %}
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>No rerun test groups.</p>
+    {% endif %}
+  </details>
+
+
+  <h2>Test Results</h2>
+  <div style="margin-bottom: 0.5em;">
+    <button id="expand-collapse-btn"
+      {% if session_idx is defined %}
+        data-session="{{ session_idx }}"
+        onclick="toggleAllDetails({{ session_idx }})"
+      {% else %}
+        onclick="toggleAllDetails()"
+      {% endif %}
+      style="margin-right:1em; padding:0.3em 1.2em; font-size:1em;"
+    >Expand All</button>
+    <strong>Filter by outcome:</strong>
+    {% set outcomes = [
+      ('passed', 'Passed'),
+      ('failed', 'Failed'),
+      ('skipped', 'Skipped'),
+      ('error', 'Error'),
+      ('xfailed', 'XFailed'),
+      ('xpassed', 'XPassed'),
+      ('rerun', 'Rerun'),
+      ('unknown', 'Unknown')
+    ] %}
+    {% for key, label in outcomes %}
+      <label style="margin-right: 1em;">
+        <input type="checkbox" class="outcome-filter"
+          {% if session_idx is defined %}
+            data-session="{{ session_idx }}"
+            id="filter-{{ key }}-{{ session_idx }}"
+            onclick="filterTestResults({{ session_idx }})"
+          {% else %}
+            id="filter-{{ key }}"
+            onclick="filterTestResults()"
+          {% endif %}
+          value="{{ key }}" checked> {{ label }}
+      </label>
+    {% endfor %}
+  </div>
+  <table id="results-table" class="sortable">
+    <thead>
+      <tr><th>Test</th><th class="col-outcome">Outcome</th><th class="col-duration">Duration</th><th>Start</th><th>Stop</th></tr>
+    </thead>
+    <tbody>
+      {% for test in test_results %}
+      {% if session_idx is defined %}
+        {% set row_id = "details-" ~ (session_idx|string) ~ '-' ~ loop.index0 %}
+        <tr class="{{ test.outcome }}">
+          <td class="test-title-cell" onclick="toggleDetails('{{ row_id }}', {{ session_idx }})">{{ test.nodeid }}</td>
+      {% else %}
+        {% set row_id = "details-" ~ loop.index0 %}
+        <tr class="{{ test.outcome }}">
+          <td class="test-title-cell" onclick="toggleDetails('{{ row_id }}')">{{ test.nodeid }}</td>
+      {% endif %}
+        <td class="col-outcome"><span class="outcome-dot" style="background:{{ outcome_color_map.get(test.outcome, '#BDBDBD') }}"></span>{{ test.outcome }}</td>
+        <td class="col-duration">{{ test.human_duration }}</td>
+        <td>{{ test.start_time }}</td>
+        <td>{{ test.stop_time }}</td>
+      </tr>
+      <tr id="{{ row_id }}" class="details-row">
+        <td colspan="5">
+          <strong>Captured stdout:</strong><div class="ansi2html-content">{{ test.capstdout_html | safe }}</div>
+          <strong>Captured stderr:</strong><div class="ansi2html-content">{{ test.capstderr_html | safe }}</div>
+          <strong>Captured log:</strong><div class="ansi2html-content">{{ test.caplog_html | safe }}</div>
+          <strong>Error/Traceback:</strong><div class="ansi2html-content">{{ test.longreprtext_html | safe }}</div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  <script>
+    function filterTestResults(sessionIdx) {
+      var selector = typeof sessionIdx === 'undefined' ? '.outcome-filter' : '.outcome-filter[data-session="' + sessionIdx + '"]';
+      var checked = Array.from(document.querySelectorAll(selector)).filter(cb => cb.checked).map(cb => cb.value);
+      var tableId = typeof sessionIdx === 'undefined' ? 'results-table' : 'results-table-' + sessionIdx;
+      var table = document.getElementById(tableId) || document.getElementById('results-table');
+      if (!table) return;
+      var rows = table.querySelectorAll('tbody tr');
+      // Always hide all details-rows initially
+      rows.forEach(function(row) {
+        if (row.classList.contains('details-row')) {
+          row.style.display = 'none';
+        }
+      });
+      // Show/hide test rows according to filter
+      rows.forEach(function(row) {
+        if (row.classList.contains('details-row')) return;
+        var outcome = row.className;
+        row.style.display = checked.includes(outcome) ? '' : 'none';
+        // Also hide details row if parent is hidden
+        var next = row.nextElementSibling;
+        if (next && next.classList.contains('details-row')) {
+          next.style.display = 'none';
+        }
+      });
+    }
+
+    function toggleAllDetails(sessionIdx) {
+      var btn = typeof sessionIdx === 'undefined'
+        ? document.getElementById('expand-collapse-btn')
+        : document.querySelector('#expand-collapse-btn[data-session="' + sessionIdx + '"]');
+      var expand = btn.innerText === 'Expand All';
+      var tableId = typeof sessionIdx === 'undefined' ? 'results-table' : 'results-table-' + sessionIdx;
+      var table = document.getElementById(tableId) || document.getElementById('results-table');
+      if (!table) return;
+      var rows = table.querySelectorAll('tbody tr');
+      rows.forEach(function(row) {
+        if (row.classList.contains('details-row')) {
+          var parent = row.previousElementSibling;
+          // Only expand/collapse if parent is visible
+          if (parent && parent.style.display !== 'none') {
+            row.style.display = expand ? 'table-row' : 'none';
+          }
+        }
+      });
+      btn.innerText = expand ? 'Collapse All' : 'Expand All';
+    }
+
+    function toggleDetails(rowId, sessionIdx) {
+      if (typeof sessionIdx === 'undefined') {
+        // Single-session: global search
+        var detailsRows = document.querySelectorAll('.details-row');
+        detailsRows.forEach(function(r) { if (r.id !== rowId) r.style.display = 'none'; });
+        var row = document.getElementById(rowId);
+        var parent = row ? row.previousElementSibling : null;
+        if (row && parent && parent.style.display !== 'none') {
+          row.style.display = row.style.display === 'table-row' ? 'none' : 'table-row';
+        }
+      } else {
+        // Multi-session: only within this session div
+        var sessionDiv = document.getElementById('session-' + sessionIdx);
+        if (!sessionDiv) return;
+        var detailsRows = sessionDiv.querySelectorAll('.details-row');
+        detailsRows.forEach(function(r) { if (r.id !== rowId) r.style.display = 'none'; });
+        var row = document.getElementById(rowId);
+        var parent = row ? row.previousElementSibling : null;
+        if (row && parent && parent.style.display !== 'none') {
+          row.style.display = row.style.display === 'table-row' ? 'none' : 'table-row';
+        }
+      }
+    }
+  </script>
+
+
+<script>
+  // Make Test Results and Warnings tables sortable by any column, toggling asc/desc on repeat click
+  document.addEventListener("DOMContentLoaded", function () {
+    function makeTableSortable(tableId) {
+      var table = document.getElementById(tableId);
+      if (!table) return;
+      var thead = table.querySelector("thead");
+      var lastSort = { col: null, dir: 1 };
+      thead.addEventListener("click", function (e) {
+        const th = e.target.closest("th");
+        if (!th) return;
+        const colIndex = Array.from(th.parentNode.children).indexOf(th);
+        const tbody = table.querySelector("tbody");
+        const rows = Array.from(tbody.querySelectorAll("tr:not(.details-row)"));
+        const isNumeric = rows.every(row => !isNaN(row.cells[colIndex]?.innerText.trim()));
+        // Toggle direction if sorting same column
+        lastSort.dir = (lastSort.col === colIndex) ? -lastSort.dir : 1;
+        lastSort.col = colIndex;
+        const sorted = rows.sort((a, b) => {
+          const aVal = a.cells[colIndex].innerText.trim();
+          const bVal = b.cells[colIndex].innerText.trim();
+          if (isNumeric) {
+            return lastSort.dir * (parseFloat(aVal) - parseFloat(bVal));
+          } else {
+            return lastSort.dir * aVal.localeCompare(bVal);
+          }
+        });
+        tbody.innerHTML = "";
+        sorted.forEach(row => tbody.appendChild(row));
+      });
+    }
+    makeTableSortable("results-table");
+    makeTableSortable("warnings-table");
+  });
+</script>
+
+<style>
+  table th {
+    cursor: pointer;
+  }
+
+  /* Pale/lighter background colors for table rows */
+  .outcome-passed    { background-color: #d4edc9; } /* pale green */
+  .outcome-failed    { background-color: #fde2e2; } /* pale red */
+  .outcome-skipped   { background-color: #fff1db; } /* pale orange */
+  .outcome-error     { background-color: #f3e6f7; } /* pale violet */
+  .outcome-xfailed   { background-color: #e5f2fd; } /* pale blue */
+  .outcome-xpassed   { background-color: #ddf8f9; } /* pale cyan */
+  .outcome-rerun     { background-color: #d6d9db; } /* pale gray */
+  .outcome-unknown   { background-color: #e9e9e9; } /* pale gray */
+</style>
+
+
+</body>
+</html>
