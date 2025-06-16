@@ -3,6 +3,28 @@
 ## [Unreleased]
 
 
+## [0.9.2] - 2025-06-16
+
+### Added
+- Major enhancements to the HTML report generator (`recap_json_to_html.py`):
+  - Switched ANSI-to-HTML rendering from Rich to ansi2html for terminal-style colored output in error/traceback and captured output sections.
+  - Improved CSS and HTML structure for colored output, whitespace, and monospace formatting.
+  - Multi-session navigation UI: dropdown/session selector for viewing multiple TestSessions in a single report.
+  - Outcome filter checkboxes reinstated and fixed for both single- and multi-session reports.
+  - Charts now render correctly for each session in multi-session HTML reports.
+  - Added "HTML File Generated: <timestamp>" metadata in reports.
+- Project release workflow shortcut: /release rule added for versioning, changelog, and README update automation.
+
+### Changed
+- Updated HTML template to remove <pre> wrappers and use ansi2html-compatible <div> blocks for colored output.
+- Improved test data and demo suite for more diverse outcome/duration scenarios.
+- Enhanced robustness of TestSession and nested model deserialization (ignores extra keys).
+
+### Fixed
+- Bug: Charts not displaying for single-session HTML reports.
+- Bug: Test result details not expanding/collapsing after outcome filter reinstatement.
+- Bug: Template file accidental deletion now documented and recovery steps clarified.
+
 ## [0.9.1] - 2025-06-14
 
 ### Added

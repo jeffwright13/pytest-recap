@@ -362,28 +362,30 @@ For cloud storage support in tests:
 
 ### Generating an Interactive HTML Report
 
-- Durations in the HTML report are now displayed with 6 decimal places for values under 10 seconds, and as human-friendly strings (e.g., `1m 2s`, `2h 3m 4s`) for longer durations.
-- Session metadata (start/stop time, duration) is always shown if available, and robustly extracted from recap JSON.
-- Warnings and errors are deduplicated to avoid repeated messages.
-- The report summary includes outcome percentages for each result type.
+pytest-recap can generate a standalone, interactive HTML report from a recap JSON file. The HTML report provides a rich summary of your test results, supporting multi-session navigation, outcome filtering, colored output, and more.
 
-
-After running your tests with pytest-recap, you can convert the `recap.json` file to a modern, interactive HTML report:
+To generate an HTML report from a recap JSON file, use the provided script:
 
 ```bash
-python recap_json_to_html.py recap.json report.html
+python scripts/recap_json_to_html.py <recap.json> <report.html>
 ```
 
-- The HTML report includes:
-  - A summary section with total tests, outcome stats, and a pie chart
-  - A collapsible Session Metadata panel
-  - A sortable and filterable results table
-  - Expandable/collapsible test details (click the test name)
-  - Outcome filtering with a master toggle
-  - Responsive, user-friendly design
+or programmatically:
 
-Open `report.html` in your browser to explore the results interactively.
+```python
+from scripts.recap_json_to_html import main
+main('recap.json', 'report.html')
+```
 
+### Key Features
+- **Multi-session navigation:** If your recap JSON contains multiple test sessions, a dropdown lets you switch between them.
+- **Outcome filter checkboxes:** Dynamically filter displayed tests by outcome (pass, fail, skip, etc.).
+- **Pie chart summary:** Visualize outcome distribution for each session.
+- **Expand/collapse test details:** Click to show/hide captured output and tracebacks for each test.
+- **Captured output with color:** stdout, stderr, and log output are rendered using ansi2html for terminal-style color support.
+- **Error tracebacks:** Displayed with syntax highlighting and color for easier debugging.
+- **Session metadata:** Each report shows the session start time and the HTML file generation timestamp (in UTC).
+- **Self-contained:** The report can be viewed offline in any modern browser.
 
 **Troubleshooting tip:** If you encounter issues with session metadata not being picked up, run pytest with `-s` to see debug output for ini/env/CLI value resolution.
 
