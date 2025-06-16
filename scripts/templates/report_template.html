@@ -53,8 +53,8 @@
   <details>
     <summary><strong>Session Metadata</strong></summary>
     <ul>
-      <li><strong>Session start:</strong> {{ session.get("session_start_time", "N/A") }}</li>
-      <li><strong>Session stop:</strong> {{ session.get("session_stop_time", "N/A") }}</li>
+      <li><strong>Session start:</strong> {{ session.get("session_start_time") | human_time }}</li>
+      <li><strong>Session stop:</strong> {{ session.get("session_stop_time") | human_time }}</li>
       <li><strong>Duration:</strong> {{ human_duration }}</li>
       <li><strong>System Under Test:</strong> {{ system_under_test.get("name", "N/A") }}</li>
       <li><strong>Host:</strong> {{ testing_system.get("hostname", "N/A") }}</li>
@@ -229,8 +229,8 @@
               <td>{{ test.nodeid }}</td>
               <td>{{ loop.index }}</td>
               <td>{{ test.duration or 'N/A' }}</td>
-              <td>{{ test.start_time or 'N/A' }}</td>
-              <td>{{ test.stop_time or 'N/A' }}</td>
+              <td>{{ test.start_time | human_time }}</td>
+              <td>{{ test.stop_time | human_time }}</td>
               <td>{{ test.outcome.value }}</td>
             </tr>
             {% endfor %}
@@ -297,8 +297,8 @@
       {% endif %}
         <td class="col-outcome"><span class="outcome-dot" style="background:{{ outcome_color_map.get(test.outcome, '#BDBDBD') }}"></span>{{ test.outcome }}</td>
         <td class="col-duration">{{ test.human_duration }}</td>
-        <td>{{ test.start_time }}</td>
-        <td>{{ test.stop_time }}</td>
+        <td>{{ test.start_time | human_time }}</td>
+        <td>{{ test.stop_time | human_time }}</td>
       </tr>
       <tr id="{{ row_id }}" class="details-row">
         <td colspan="5">

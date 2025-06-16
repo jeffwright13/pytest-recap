@@ -1,7 +1,8 @@
-import pytest
-import time
 import logging
+import time
 import warnings
+
+import pytest
 
 logger = logging.getLogger("demo")
 

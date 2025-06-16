@@ -8,6 +8,19 @@ from jinja2 import Environment, FileSystemLoader
 from pytest_recap.models import RerunTestGroup
 
 
+def human_time(value):
+    """Format ISO datetime string as 'YYYY-MM-DD HH:MM UTC' or return as-is if not valid."""
+    from datetime import datetime, timezone
+
+    if not value or not isinstance(value, str):
+        return value or "N/A"
+    try:
+        dt = datetime.fromisoformat(value.rstrip("Z")).replace(tzinfo=timezone.utc)
+        return dt.strftime("%Y-%m-%d %H:%M:%S.%f UTC")
+    except Exception:
+        return value
+
+
 def format_human_duration(seconds: Optional[float]) -> str:
     if seconds is None:
         return "N/A"
@@ -35,6 +48,7 @@ def render_report(json_path: Path, html_path: Path, template_dir: Path) -> None:
     sessions = data if isinstance(data, list) else [data]
 
     env = Environment(loader=FileSystemLoader(template_dir))
+    env.filters["human_time"] = human_time
     template = env.get_template("report_template.html")
 
     def dedup(items):
@@ -62,7 +76,9 @@ def render_report(json_path: Path, html_path: Path, template_dir: Path) -> None:
         duration = None
         if session_start and session_stop:
             try:
-                duration = (datetime.fromisoformat(session_stop) - datetime.fromisoformat(session_start)).total_seconds()
+                duration = (
+                    datetime.fromisoformat(session_stop) - datetime.fromisoformat(session_start)
+                ).total_seconds()
                 human_duration = format_human_duration(duration)
             except Exception:
                 duration = None
@@ -97,13 +113,15 @@ def render_report(json_path: Path, html_path: Path, template_dir: Path) -> None:
             dur = result.get("duration")
             result["human_duration"] = format_human_duration(dur) if dur is not None else "N/A"
         # Save chart info for this session
-        charts.append({
-            "labels": chart_labels,
-            "data": chart_data,
-            "colors": chart_colors,
-        })
+        charts.append(
+            {
+                "labels": chart_labels,
+                "data": chart_data,
+                "colors": chart_colors,
+            }
+        )
         # Render template for this session
-        chart_id = f"pieChart" if len(sessions) == 1 else f"pieChart-{idx}"
+        chart_id = "pieChart" if len(sessions) == 1 else f"pieChart-{idx}"
         html = template.render(
             total=len(test_results),
             session=session,
@@ -122,7 +140,7 @@ def render_report(json_path: Path, html_path: Path, template_dir: Path) -> None:
             chart_id=chart_id,
         )
         rendered_reports.append(html)
-        label = f"{session.get('session_id', 'Session '+str(idx+1))}"
+        label = f"{session.get('session_id', 'Session ' + str(idx + 1))}"
         if session.get("session_start_time"):
             label += f" ({session['session_start_time']})"
         session_labels.append(label)
@@ -132,8 +150,8 @@ def render_report(json_path: Path, html_path: Path, template_dir: Path) -> None:
         # Single session: inject chartData and JS for chart rendering
         chart_id = "pieChart"
         chart_obj = charts[0]
-        chart_data_js_obj = '{"pieChart": ' + json.dumps(chart_obj) + '}'
-        js = f'''
+        chart_data_js_obj = '{"pieChart": ' + json.dumps(chart_obj) + "}"
+        js = f"""
 <script>
 var chartInstances = {{}};
 var chartData = {chart_data_js_obj};
@@ -155,10 +173,11 @@ window.addEventListener('DOMContentLoaded', function() {{
     if (first) initChart(first.id);
 }});
 </script>
-'''
+"""
         # Insert generated_at timestamp
         from datetime import datetime, timezone
-        generated_at = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S %Z')
+
+        generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S %Z")
         # Insert JS and pass generated_at to template
         # Re-render the template with generated_at
         html = template.render(
@@ -180,23 +199,23 @@ window.addEventListener('DOMContentLoaded', function() {{
             generated_at=generated_at,
         )
         # Insert JS before </body>
-        if '</body>' in html:
-            html = html.replace('</body>', js + '</body>')
+        if "</body>" in html:
+            html = html.replace("</body>", js + "</body>")
         html_path.write_text(html, encoding="utf-8")
     else:
         # Compose dropdown and JS
         nav_html = [
             '<div class="session-nav-container">',
             '<label for="session-select" class="session-nav-label"><strong>Choose session:</strong></label>',
-            '<select id="session-select" class="session-nav-select">'
+            '<select id="session-select" class="session-nav-select">',
         ]
         for idx, label in enumerate(session_labels):
             nav_html.append(f'<option value="session-{idx}">{label}</option>')
-        nav_html.append('</select>')
-        nav_html.append('</div>')
+        nav_html.append("</select>")
+        nav_html.append("</div>")
         # Wrap each report in a div
         # Add style block for modern dropdown
-        style_block = '''<style>
+        style_block = """<style>
 .session-nav-container {
   display: flex;
   align-items: center;
@@ -225,19 +244,20 @@ window.addEventListener('DOMContentLoaded', function() {{
   border: 1.5px solid #1976d2;
   box-shadow: 0 0 0 2px #1976d230;
 }
-</style>'''
+</style>"""
 
         # Build chart data for each session directly from computed values
         chart_data_js = []
         for idx, chart in enumerate(charts):
-            chart_id = f"pieChart" if len(charts) == 1 else f"pieChart-{idx}"
+            chart_id = "pieChart" if len(charts) == 1 else f"pieChart-{idx}"
             chart_data_js.append(f'"{chart_id}": {json.dumps(chart)}')
-        chart_data_js_obj = '{' + ','.join(chart_data_js) + '}'
+        chart_data_js_obj = "{" + ",".join(chart_data_js) + "}"
 
         reports_html = []
         # Compute generated_at timestamp once for all sessions
         from datetime import datetime, timezone
-        generated_at = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S %Z')
+
+        generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S %Z")
         # Re-render all reports with generated_at
         for idx, data in enumerate(sessions):
             style = "" if idx == 0 else "display:none;"
@@ -280,13 +300,13 @@ window.addEventListener('DOMContentLoaded', function() {{
                 outcome_color_map=outcome_color_map,
                 outcome_counts=outcome_counts,
                 outcome_percentages=outcome_percentages,
-                chart_id=f"pieChart" if len(charts) == 1 else f"pieChart-{idx}",
+                chart_id="pieChart" if len(charts) == 1 else f"pieChart-{idx}",
                 generated_at=generated_at,
                 session_idx=idx,
             )
             reports_html.append(f'<div id="session-{idx}" class="session-report" style="{style}">{report}</div>')
         # JS for switching and lazy chart initialization
-        js = f'''
+        js = f"""
 <script>
 var chartInstances = {{}};
 var chartData = {chart_data_js_obj};
@@ -319,17 +339,19 @@ window.addEventListener('DOMContentLoaded', function() {{
     if (first) initChart(first.id);
 }});
 </script>
-'''
+"""
         # Compose final HTML
-        full_html = "\n".join([
-            "<html><head><meta charset=\"utf-8\">",
-            style_block,
-            "</head><body>",
-            *nav_html,
-            *reports_html,
-            js,
-            "</body></html>"
-        ])
+        full_html = "\n".join(
+            [
+                '<html><head><meta charset="utf-8">',
+                style_block,
+                "</head><body>",
+                *nav_html,
+                *reports_html,
+                js,
+                "</body></html>",
+            ]
+        )
         html_path.write_text(full_html, encoding="utf-8")
     print(f"Wrote report: {html_path}")
 

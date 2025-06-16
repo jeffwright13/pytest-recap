@@ -37,17 +37,18 @@ The mechanics are as follows:
    - Log warnings, errors, and summary statistics as appropriate.
 """
 
-import time
-import requests
 import json
 import os
-from bs4 import BeautifulSoup
-from typing import List, Dict, Optional, Callable
-from pytest_pail.models_pytest_recap import TestSession, TestResult, TestOutcome, RerunTestGroup
-import typer
+import time
 from datetime import datetime, timedelta, timezone
-from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeElapsedColumn, TaskProgressColumn
+from typing import Callable, Dict, List, Optional
+
 import jsonschema
+import requests
+import typer
+from bs4 import BeautifulSoup
+from pytest_pail.models_pytest_recap import RerunTestGroup, TestOutcome, TestResult, TestSession
+from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn, TimeElapsedColumn
 
 app = typer.Typer(help="Pytest session collection and utilities")
 
@@ -57,17 +58,22 @@ DEFAULT_BUILDS_SUBDIR = "builds"
 DEFAULT_REPORTS_SUBDIR = "reports"
 DEFAULT_MAX_REPORTS = 50
 
+CACHE_BUILDS_DIR = os.path.join(DEFAULT_CACHE_DIR, DEFAULT_BUILDS_SUBDIR)
+CACHE_REPORTS_DIR = os.path.join(DEFAULT_CACHE_DIR, DEFAULT_REPORTS_SUBDIR)
+
 SYSTEMS = [
     {"name": "qa-jeff-dist-core-openjdk17-2"},
 ]
 
 MAX_BUILDS_PER_SYSTEM = 50
 
+
 def get_jwt_key() -> str:
     jwt = os.getenv("SITEBUILDER_JWT_KEY")
     if not jwt:
         raise RuntimeError("SITEBUILDER_JWT_KEY environment variable not set.")
     return jwt
+
 
 def robust_request(
     request_fn: Callable[[], requests.Response],
@@ -82,7 +88,7 @@ def robust_request(
         if response.status_code == 200:
             return response
         elif response.status_code == 503 and retries < max_retries:
-            wait = delay * (2 ** retries)
+            wait = delay * (2**retries)
             if context:
                 print(f"503 error {context}, retrying in {wait}s...")
             time.sleep(wait)
@@ -98,6 +104,7 @@ def robust_request(
         print(f"Failed after {max_retries} retries: {context or ''}")
     return None
 
+
 class BuildFetcher:
     BASE_URL = "https://sitebuilder.sb.gems.energy"
 
@@ -110,14 +117,16 @@ class BuildFetcher:
     def fetch_builds(self, system_name: str, max_retries=4, delay=3) -> list:
         # Always redownload builds from API, ignore cache
         url = f"{self.BASE_URL}/api/v1/projects/{system_name}/builds"
+
         def req():
             return requests.get(url, headers=self.headers)
+
         response = robust_request(
             req,
             max_retries=max_retries,
             delay=delay,
             context=f"fetching builds for {system_name}",
-            not_found_message=f"404 error: Project {system_name} not found."
+            not_found_message=f"404 error: Project {system_name} not found.",
         )
         builds = [] if response is None else response.json()
         # Optionally update cache for inspection, but never read from cache
@@ -130,6 +139,7 @@ class BuildFetcher:
                 print(f"Warning: Failed to cache builds for {system_name}: {e}")
         return builds
 
+
 def download_pytest_html(build_id, jwt, dest_dir="reports", max_retries=3, delay=2, cache=True):
     os.makedirs(dest_dir, exist_ok=True)
     os.makedirs(CACHE_REPORTS_DIR, exist_ok=True)
@@ -139,14 +149,16 @@ def download_pytest_html(build_id, jwt, dest_dir="reports", max_retries=3, delay
         return cache_path
     url = f"https://sitebuilder.sb.gems.energy/api/v1/projects/project-builds/{build_id}/report/"
     headers = {"Authorization": f"Bearer {jwt}"}
+
     def req():
         return requests.get(url, headers=headers)
+
     response = robust_request(
         req,
         max_retries=max_retries,
         delay=delay,
         context=f"downloading report for build {build_id}",
-        not_found_message=f"404 error for build {build_id}: report not found."
+        not_found_message=f"404 error for build {build_id}: report not found.",
     )
     if response is None:
         raise Exception(f"Report for build {build_id} not found.")
@@ -154,6 +166,7 @@ def download_pytest_html(build_id, jwt, dest_dir="reports", max_retries=3, delay
         f.write(response.content)
     time.sleep(delay)
     return cache_path
+
 
 def group_tests_into_rerun_test_groups(
     test_results: List[TestResult],
@@ -165,13 +178,8 @@ def group_tests_into_rerun_test_groups(
         rerun_test_groups[test_result.nodeid].tests.append(test_result)
     return list(rerun_test_groups.values())
 
-def parse_pytest_html_report(
-    html_path,
-    system_under_test=None,
-    session_id=None,
-    build_id=None,
-    system_info=None
-):
+
+def parse_pytest_html_report(html_path, system_under_test=None, session_id=None, build_id=None, system_info=None):
     """
     Parse a pytest-html report and build a TestSession object using pytest_recap.models.
     Ensures all timestamps are timezone-aware UTC.
@@ -205,7 +213,9 @@ def parse_pytest_html_report(
                 duration = None
             try:
                 # If time present, make it timezone-aware UTC
-                start_time = datetime.strptime(cells[4].get_text(strip=True), "%Y-%m-%d %H:%M:%S.%f").replace(tzinfo=timezone.utc)
+                start_time = datetime.strptime(cells[4].get_text(strip=True), "%Y-%m-%d %H:%M:%S.%f").replace(
+                    tzinfo=timezone.utc
+                )
             except Exception:
                 start_time = datetime.now(timezone.utc)
             stop_time = start_time
@@ -248,16 +258,21 @@ def parse_pytest_html_report(
     )
     return session
 
+
 @app.command()
 def collect(
     output_file: str = typer.Option(DEFAULT_OUTPUT_FILE, "--output", help="Output JSON file for all sessions"),
     cache_dir: str = typer.Option(DEFAULT_CACHE_DIR, "--cache-dir", help="Root cache directory"),
     builds_subdir: str = typer.Option(DEFAULT_BUILDS_SUBDIR, "--builds-subdir", help="Builds cache subdirectory"),
     reports_subdir: str = typer.Option(DEFAULT_REPORTS_SUBDIR, "--reports-subdir", help="Reports cache subdirectory"),
-    max_reports: int = typer.Option(DEFAULT_MAX_REPORTS, "--max-reports", help="Max number of reports/files to process"),
+    max_reports: int = typer.Option(
+        DEFAULT_MAX_REPORTS, "--max-reports", help="Max number of reports/files to process"
+    ),
     json_output: bool = typer.Option(False, "--json", help="Output results as JSON to stdout"),
     no_cache: bool = typer.Option(False, "--no-cache", help="Disable local caching of builds and reports"),
-    validate_schema: bool = typer.Option(True, "--validate/--no-validate", help="Validate output JSON against pytest-recap schema")
+    validate_schema: bool = typer.Option(
+        True, "--validate/--no-validate", help="Validate output JSON against pytest-recap schema"
+    ),
 ):
     """
     Main entry point for collecting test results, outputting JSON compliant with pytest-recap schema,
@@ -267,9 +282,8 @@ def collect(
     jwt = get_jwt_key()
 
     use_cache = not no_cache
-    fetcher = BuildFetcher(jwt, cache=use_cache)
+    BuildFetcher(jwt, cache=use_cache)
     all_sessions = []
-    system_builds = []
 
     # Compose full cache paths
     builds_dir = os.path.join(cache_dir, builds_subdir)
@@ -278,7 +292,7 @@ def collect(
     os.makedirs(reports_dir, exist_ok=True)
 
     processed = 0
-    report_files = [f for f in os.listdir(reports_dir) if f.endswith('.html')][:max_reports]
+    report_files = [f for f in os.listdir(reports_dir) if f.endswith(".html")][:max_reports]
     total_tasks = len(report_files)
     with Progress(
         SpinnerColumn(),
@@ -286,13 +300,11 @@ def collect(
         BarColumn(),
         TaskProgressColumn(),
         TimeElapsedColumn(),
-        transient=True
+        transient=True,
     ) as progress:
-        task = progress.add_task(
-            "Processing cached HTML reports", total=total_tasks
-        )
+        task = progress.add_task("Processing cached HTML reports", total=total_tasks)
         for fname in report_files:
-            build_id = fname.replace('.html', '')
+            build_id = fname.replace(".html", "")
             html_path = os.path.join(reports_dir, fname)
             # Try to infer system name from build caches
             system_name = None
@@ -309,9 +321,7 @@ def collect(
                 system_name = "unknown"
             try:
                 session = parse_pytest_html_report(
-                    html_path,
-                    system_under_test={"name": system_name},
-                    session_id=build_id
+                    html_path, system_under_test={"name": system_name}, session_id=build_id
                 )
                 if session:
                     all_sessions.append(session)
@@ -323,7 +333,7 @@ def collect(
     # Deduplicate sessions by session_id (last-in-wins)
     session_map = {}
     for s in all_sessions:
-        if hasattr(s, 'session_id'):
+        if hasattr(s, "session_id"):
             session_map[s.session_id] = s
         else:
             # Fallback: include session if no session_id
@@ -356,7 +366,7 @@ def collect(
 @app.command()
 def deduplicate(
     input_file: str = typer.Argument(DEFAULT_OUTPUT_FILE, help="Input JSON file to deduplicate"),
-    output_file: str = typer.Option("all_test_sessions.deduped.json", "--output", help="Deduplicated output JSON file")
+    output_file: str = typer.Option("all_test_sessions.deduped.json", "--output", help="Deduplicated output JSON file"),
 ):
     """
     Deduplicate a JSON file of test sessions by session_id. Keeps the last occurrence of each session_id.
@@ -374,6 +384,7 @@ def deduplicate(
     with open(output_file, "w") as f:
         json.dump(deduped, f, indent=2)
     print(f"Deduplicated {len(sessions)} sessions to {len(deduped)} unique session_ids. Output: {output_file}")
+
 
 if __name__ == "__main__":
     app()

@@ -6,11 +6,13 @@ Usage:
     python deduplicate_sessions.py [input.json] [output.json]
 If no arguments are given, defaults to 'all_test_sessions.json' in the current directory.
 """
-import sys
+
 import json
+import sys
 
 INPUT = sys.argv[1] if len(sys.argv) > 1 else "all_test_sessions.json"
 OUTPUT = sys.argv[2] if len(sys.argv) > 2 else "all_test_sessions.deduped.json"
+
 
 def main():
     with open(INPUT, "r") as f:
@@ -26,6 +28,7 @@ def main():
     with open(OUTPUT, "w") as f:
         json.dump(deduped, f, indent=2)
     print(f"Deduplicated {len(sessions)} sessions to {len(deduped)} unique session_ids. Output: {OUTPUT}")
+
 
 if __name__ == "__main__":
     main()
